@@ -37,6 +37,10 @@ Um passo de 0,5 ms custa o mesmo que um de 1 ms com as mesmas formas de array; p
 | 2 | 52,7 (5,3%) | 56,0 | 121,7 | 23,8% |
 | 3 | 56,2 (5,6%) | 56,1 | 135,7 | 26,9% |
 
+Depois do modulador de ausência (um `if` por passo, que só age quando você está ausente), três
+novas execuções deram: rede real 51 a 57 µs (5,1% a 5,7%); 630 com passo de 0,5 ms entre 23,1% e 23,9%.
+Ou seja, o custo ficou dentro do ruído das medidas anteriores.
+
 Resumo: **a rede atual gasta cerca de 5,5% de um núcleo**. Uma rede de 630 neurônios com passo de
 0,5 ms gastaria **entre 23% e 27% de um núcleo** nesta máquina (mediana perto de 24%).
 

@@ -92,6 +92,8 @@ def rede_sintetica(N, base):
     b.adapt_decay = np.exp(-1.0 / rng.uniform(50.0, 500.0, Nl))
     b.adapt_b = rng.uniform(0.0, 0.1, Nl)
     b.trace = np.zeros(N)
+    b.ausente = False                                    # modulador de ausência: desligado, como com você presente
+    b._idx_ausencia = np.empty(0, dtype=int)
     b.pool_counts = np.zeros(P)
     onehot = np.zeros((N, P))
     onehot[np.arange(N), rng.integers(0, P, N)] = 1.0

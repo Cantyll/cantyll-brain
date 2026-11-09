@@ -22,6 +22,7 @@ computador e você ──► sentidos (0..1) ──► neurônios sensoriais (Po
 - **Habituação:** cada canal perde eficácia a cada disparo (`d`) e recupera em `tau_rec` segundos.
 - **Temperamento:** `pets/*.json` multiplica as sinapses que saem dos sentidos (o mesmo estímulo pesa diferente em cada pet).
 - **Inibição lateral:** motores competem só dentro do seu grupo (expressão com expressão, decisão com decisão).
+- **Ausência (modulador, R1):** com o usuário ausente, FUGIR e TRAVESSURA recebem corrente inibitória (`ajustes.AUSENCIA_CORRENTE`). Não é canal sensorial e não mexe no sorteio da rede.
 - **Aprendizado por carinho:** regra de três fatores entre canais sensoriais e PLAYFUL/CALM/FRUSTRATION/GLOOM, com recompensa (+ carinho, − dispensa e castigo).
 - **Condicionamento:** Rescorla–Wagner fora da rede (`core/conditioning.py`); a força prevista entra como `ANTICIPATE` (cutucada/arraste) e `ANTECIPA_PLACA` (cantinho).
 

@@ -5,7 +5,7 @@
 ### Mudanças de comportamento
 - Ausência não deixa mais o pet triste. A carência (`LONELY`) leva a cansaço e quietude, não à tristeza. Cansaço deixou de levar à tristeza e ao cantinho.
 - A tristeza vem só da rede triste: travessura dispensada, bolinha levada, pancada forte, pedido recusado e fuga do cantinho que deu errado. O protesto de tristeza sobe só com ela.
-- Ausente (sem atividade além do limite), ele não apronta travessuras e, se estiver no cantinho, não junta vontade de fugir.
+- Ausente (sem atividade além do limite), a rede segura a travessura e a vontade de fugir: ele não apronta, e no cantinho não tenta fugir.
 - O sono deixou de depender da energia. Agora dorme quando a pressão de sono (horas acordado) está alta e o relógio marca a noite. Com o pico de vigília às 16 h (padrão), dorme por volta das 21 h e acorda por volta das 7 h. Carinho acorda na hora. De dia, só dorme se a pressão passar de 0,95.
 - `pets/*.json` aceita `pico_vigilia_h` (de 0 a 24). Bryan e Jorge usam 16.
 - Jorge perdeu o temperamento `LONELY->GLOOM`, porque essa ligação deixou de existir.
