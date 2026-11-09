@@ -298,7 +298,7 @@ def test_aprendizado_persiste_entre_saves(tmp_path):
     for _ in range(60):
         brain.stimulate({"WEB": 1.0, "CARESS": 1.0})
         brain.step(100)
-        brain.learn(1.0, 0.1, 0.004)
+        brain.learn(1.0, 0.0, 0.1, 0.004)
     brain.save(str(path))
     again = LIFBrain(seed=7)
     assert again.load(str(path))

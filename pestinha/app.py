@@ -58,7 +58,7 @@ from .core.conditioning import Conditioning
 from .core.emotion import PRIORITY, EmotionState
 from .core.episodic import EpisodicMemory
 from .core.homeostasis import Drives
-from .core.nervous_system import LIFBrain
+from .core.nervous_system import criar_cerebro
 from .core.protesto import Protesto
 from .log import log
 from .mind.castigo_ctl import CastigoController
@@ -110,7 +110,8 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         self.conteudo = self.paths.conteudo(pet_id)   # frases, cartazes e imagens deste pet
         self.nome = pet_def["nome"]                   # quem fala nos textos; o programa é config.APP_NOME
         self.reacao_notebook = pet_def["reacao_notebook"]     # "bravo" ou "triste": depende do pet
-        self.brain = LIFBrain(seed=pet_def["seed"], temperament=pet_def.get("temperamento"))
+        self.brain = criar_cerebro(config.cerebro_escolhido(), seed=pet_def["seed"],
+                                   temperament=pet_def.get("temperamento"))
         self.state_file = self.pet_paths.nervous
         self.brain.load(str(self.state_file))
         self.intensities = {}       # última entrada da rede (para o monitor)
@@ -437,7 +438,8 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
             if self.mischief_ctl.penalty_active(now):
                 reward += DISMISS_PENALTY
         reward += self.castigo.punicao(now)          # ser preso é recompensa negativa: o castigo ensina
-        self.brain.learn(reward, dt, self.prof["learn_rate"])
+        # expected = 0: recompensa bruta, como antes. O V do condicionamento só entra no M2 (decisão D3).
+        self.brain.learn(reward, 0.0, dt, self.prof["learn_rate"])
 
         if self.in_flight:
             if body.grounded:

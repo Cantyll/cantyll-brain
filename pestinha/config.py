@@ -10,7 +10,19 @@ import random
 from .paths import pet_id_valido
 from .store import read_json, read_lines, write_json
 
-EMOTIONS = ["feliz", "contente", "observando", "curioso", "bravo", "triste", "assustado", "dramatico"]
+# Núcleo neural (docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md, seção 11). "lif" é o padrão e o único pronto;
+# "bio" entra no M1. Um nome que não está pronto volta para "lif", sem trocar a rede em silêncio.
+CEREBRO = "lif"
+CEREBROS_PRONTOS = ("lif",)
+
+
+def cerebro_escolhido(nome=None):
+    """Nome do cérebro a usar: o pedido, se estiver pronto; senão, o padrão 'lif'."""
+    nome = CEREBRO if nome is None else nome
+    return nome if nome in CEREBROS_PRONTOS else "lif"
+
+
+EMOTIONS =["feliz", "contente", "observando", "curioso", "bravo", "triste", "assustado", "dramatico"]
 
 EMOTION_NAMES = {
     "feliz": "FELIZ",

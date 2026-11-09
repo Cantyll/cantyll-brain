@@ -204,7 +204,7 @@ def test_15_a_21_ciclo_lento_integra_o_mesmo_que_ciclos_rapidos(mundo, monkeypat
         original = alvo.tick
         monkeypatch.setattr(alvo, "tick", lambda *a, _o=original, _n=nome, **k: (chamadas.setdefault(_n, a[0]), _o(*a, **k))[1])
     original_learn = b.brain.learn
-    monkeypatch.setattr(b.brain, "learn", lambda r, dt, rate: (chamadas.setdefault("aprendizado", dt), original_learn(r, dt, rate))[1])
+    monkeypatch.setattr(b.brain, "learn", lambda *a, _o=original_learn: (chamadas.setdefault("aprendizado", a[2]), _o(*a))[1])
     original_festa = b.festa.tick
     monkeypatch.setattr(b.festa, "tick", lambda *a: (chamadas.setdefault("euforia", a[5]), original_festa(*a))[1])
     b.think()

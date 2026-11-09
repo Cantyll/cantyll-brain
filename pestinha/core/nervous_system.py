@@ -100,6 +100,7 @@ PLASTIC_DENSITY = 0.5
 LEARN_MIN, LEARN_MAX = -0.05, 0.08     # peso aprendido (fração do limiar)
 ELIGIBILITY_TAU = 4.0                  # s: quanto tempo um contexto "conta" para a recompensa
 LEARNED_VERSION = 2                    # 2: TYPING passou a ser só teclado
+LEARN_RATE_PADRAO = 0.004              # taxa usada quando quem chama não passa uma (o perfil "teste" usa esta)
 
 # ============================================================
 # INTERNEURÔNIOS: nome, tipo, n, tau_m (ms), adapt_b, adapt_tau (s), centro
@@ -329,6 +330,33 @@ class Brain(ABC):
     @abstractmethod
     def snapshot(self):
         """Dados para visualização."""
+
+    @abstractmethod
+    def learn(self, reward, expected, dt, rate=LEARN_RATE_PADRAO):
+        """
+        Erro de predição: δ = reward - expected. dt em segundos, chamado a cada passo.
+        expected = 0 significa recompensa bruta (comportamento anterior à fase M2).
+        """
+
+    @abstractmethod
+    def estado(self):
+        """Resumo serializável do estado da rede (versão, tempo simulado, habituação, aprendizado)."""
+
+    def avancar(self, dt_s, teto_s=1.0):
+        """
+        Avança a rede por dt_s segundos de tempo real. O teto por chamada (padrão 1 s) protege
+        de um atraso grande (computador que dormiu). Devolve os segundos realmente simulados,
+        para quem chama saber quanto tempo a rede viveu.
+        """
+        simulado = min(max(0.0, float(dt_s)), float(teto_s))
+        ms = int(round(simulado * 1000))
+        total = 0
+        while ms > 0:
+            chunk = min(100, ms)
+            self.step(chunk)
+            ms -= chunk
+            total += chunk
+        return total / 1000.0
 
     def save(self, path):
         """Grava o estado do cérebro no arquivo (a rede implementa)."""
@@ -624,18 +652,20 @@ class LIFBrain(Brain):
 
     # ---------------- aprendizado ----------------
 
-    def learn(self, reward, dt_s, rate):
+    def learn(self, reward, expected, dt_s, rate=LEARN_RATE_PADRAO):
         """
         Chamar a cada passo: atualiza a elegibilidade (o que estava ativo nos
-        últimos segundos) e, se houver recompensa, ajusta as sinapses plásticas.
-        reward: + carinho, - rejeição. rate: velocidade de aprendizado.
+        últimos segundos) e, se o erro de predição δ = reward - expected não for zero,
+        ajusta as sinapses plásticas. reward: + carinho, - rejeição.
+        expected = 0 mantém o comportamento anterior (recompensa bruta).
         """
         k = 1.0 - math.exp(-dt_s / ELIGIBILITY_TAU)
         self.eligibility += (self._levels - self.eligibility) * k
-        if reward == 0.0:
+        delta_predicao = reward - expected
+        if delta_predicao == 0.0:
             return
-        delta = rate * reward * dt_s * np.outer(self.eligibility, self.post_sign)
-        self.learned = np.clip(self.learned + delta, LEARN_MIN, LEARN_MAX)
+        change = rate * delta_predicao * dt_s * np.outer(self.eligibility, self.post_sign)
+        self.learned = np.clip(self.learned + change, LEARN_MIN, LEARN_MAX)
         self._apply_learning()
 
     def _apply_learning(self):
@@ -679,11 +709,29 @@ class LIFBrain(Brain):
         """Resumo da rede: quantos neurônios e sinapses."""
         return f"LIF {self.N} neurônios, {self.n_synapses} sinapses (desenhada à mão)"
 
+    def estado(self):
+        """Resumo serializável: versão, tempo simulado, habituação por canal, aprendizado e taxas por população."""
+        return {
+            "tipo": "lif",
+            "versao": 1,
+            "semente": self.seed,
+            "neuronios": self.N,
+            "sinapses": self.n_synapses,
+            "tempo_ms": float(self.time_ms),
+            "eficacia": self.efficacy(),
+            "aprendido": {
+                c: {post: float(self.learned[i, j]) for j, post in enumerate(self.plastic_posts)}
+                for i, c in enumerate(self.sensory_names)
+            },
+            "taxas": self.pool_rates(),
+        }
+
     # ---------------- persistência ----------------
 
     def save(self, path):
         """Grava pesos, habituação e aprendizado no arquivo JSON (escrita atômica)."""
         data = {
+            "tipo": "lif",
             "version": 1,
             "seed": self.seed,
             "saved_at": time.time(),
@@ -710,7 +758,8 @@ class LIFBrain(Brain):
         if not isinstance(data, dict):
             return False
         try:
-            if data.get("version") != 1 or data.get("seed") != self.seed:
+            # saves antigos não têm "tipo": são LIF. Outro tipo nunca é lido como LIF.
+            if data.get("tipo", "lif") != "lif" or data.get("version") != 1 or data.get("seed") != self.seed:
                 return False
             elapsed = max(0.0, time.time() - valor_real(data["saved_at"], 0.0, 1e13))
 
@@ -754,6 +803,13 @@ class LIFBrain(Brain):
         except Exception as error:
             log(f"[nervous] estado ilegível ({error}); começando do zero")
             return False
+
+def criar_cerebro(tipo="lif", seed=None, temperament=None):
+    """Escolhe o backend pelo nome (config.CEREBRO). Nesta fase só existe 'lif'; outro nome levanta ValueError."""
+    if tipo == "lif":
+        return LIFBrain(seed=seed, temperament=temperament)
+    raise ValueError(f"cérebro desconhecido: {tipo!r}")
+
 
 # ============================================================
 # DECODIFICADOR MOTOR
