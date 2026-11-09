@@ -133,11 +133,35 @@ ZZZ_QUANTIDADE = 3
 ZZZ_PERIODO = 2.4               # s que cada Z leva para subir e sumir
 
 # ---------------------------------------------------------------------------
+# Ritmo e sono (docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md, seções 8 e 8.1; ritmo.py)
+# ---------------------------------------------------------------------------
+PICO_VIGILIA_H = 16.0           # h: pico de vigília, no fim da tarde (cada pet troca em pets/*.json: pico_vigilia_h)
+K_PRESSAO_ACORDADO = 0.1        # 1/h: P sobe de 0 a ~0,8 em 16 h acordado (spec: 0,1)
+K_PRESSAO_DORMINDO = 0.12       # 1/h: P cai de ~0,8 a 0,25 em ~10 h dormindo (spec: 0,35, que dava só 3,7 h de sono)
+PRESSAO_INICIAL = 0.3           # P de um pet novo
+LIMIAR_DORME_PRESSAO = 0.75     # dorme se P passa disso e o relógio está na noite (C < LIMIAR_DORME_C)
+LIMIAR_DORME_C = 0.2
+LIMIAR_DORME_FORCADO = 0.95     # dorme de qualquer jeito se P passar disso (não passa 16 h acordado)
+LIMIAR_ACORDA_PRESSAO = 0.25    # acorda se P cair abaixo disso
+LIMIAR_ACORDA_C = 0.6           # ou se estiver no pico de vigília (C > isso) com P abaixo de LIMIAR_ACORDA_PRESSAO_DIA
+LIMIAR_ACORDA_PRESSAO_DIA = 0.5
+
+# ---------------------------------------------------------------------------
 # Validação
 # ---------------------------------------------------------------------------
 
 # nome: (tipo, mínimo, máximo) para números; listas e tuplas têm regra própria
 _LIMITES = {
+    "PICO_VIGILIA_H": (float, 0.0, 23.99),
+    "K_PRESSAO_ACORDADO": (float, 0.001, 2.0),
+    "K_PRESSAO_DORMINDO": (float, 0.001, 2.0),
+    "PRESSAO_INICIAL": (float, 0.0, 1.0),
+    "LIMIAR_DORME_PRESSAO": (float, 0.0, 1.0),
+    "LIMIAR_DORME_C": (float, -1.0, 1.0),
+    "LIMIAR_DORME_FORCADO": (float, 0.0, 1.0),
+    "LIMIAR_ACORDA_PRESSAO": (float, 0.0, 1.0),
+    "LIMIAR_ACORDA_C": (float, -1.0, 1.0),
+    "LIMIAR_ACORDA_PRESSAO_DIA": (float, 0.0, 1.0),
     "COOLDOWN_CUTUCADA": (float, 0.0, 5.0),
     "TEMPO_MAX_CUTUCADA_MS": (int, 50, 2000),
     "DISTANCIA_INICIO_ARRASTE": (int, 0, 100),

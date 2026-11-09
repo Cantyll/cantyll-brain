@@ -39,8 +39,10 @@ app inteiro usam um relógio virtual: avançam o tempo sem esperar.
 | `test_mesa.py` | Notebook: sentar e levantar pelo disparo do neurônio SENTAR. |
 | `test_migracao.py` | Etapa 1 do multipet: memória por pet (memory/pets/<pet>/) e a migração da versão antiga. |
 | `test_nucleo.py` | Testes dos módulos puros: nada de Qt, nada de Windows. |
+| `test_nucleo_m0.py` | M0 do núcleo biológico (docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md, seções 11 e 13): interface Brain com erro de predição em learn(), avancar(), estado(), versionamento e roundtrip. |
 | `test_paineis.py` | Painéis do menu (monitor neural e painel de protesto): abrir à mão deve manter o painel na tela. |
 | `test_pedido.py` | Pedir para trabalhar: o neurônio SENTAR decide. |
 | `test_plataforma.py` | Plataforma: cada sistema expõe as mesmas funções, e as leituras de texto (wmctrl, xdotool, ioreg, janelas do Quartz) são testadas com saídas de exemplo, em qualquer sistema. |
+| `test_ritmo.py` | Ritmo e sono (core/ritmo.py e homeostasis.Drives): vigília de dia, sono à noite, com a pressão de sono da spec. |
 | `test_robustez.py` | Robustez: arquivo corrompido, assets faltando, log em arquivo. |
 | `test_robustez_v2.py` | Falhas do relatório técnico (docs/auditorias/ANALISE_TECNICA.md): cada caso tem um teste que reproduz o problema. |

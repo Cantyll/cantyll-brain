@@ -155,15 +155,32 @@ def test_repressao_aumenta_a_insatisfacao(buddy):
     assert pr.grievance > before and pr.repressions == 1
 
 
-def test_dormir_e_acordar_pela_energia(buddy):
+def test_dormir_e_acordar_pela_pressao_e_pelo_relogio(buddy):
+    """Dorme à noite com a pressão alta; de dia, com a mesma pressão, não. Acorda quando a pressão cai."""
     body = buddy.pet.body
     body.grounded = True
     body.held = False
-    buddy.drives.energy = 0.1
+    buddy.sleep.relogio = lambda: 14.0          # dia: C > 0,2 com pico em 16 h
+    buddy.drives.pressao = 0.9
+    buddy.sleep.tick(0.0, body, False, 0, None)
+    assert not buddy.sleep.asleep
+    buddy.sleep.relogio = lambda: 22.0          # noite: C = 0
     buddy.sleep.tick(0.0, body, False, 0, None)
     assert buddy.sleep.asleep
-    buddy.drives.energy = 1.0
+    buddy.drives.pressao = 0.1
     buddy.sleep.tick(0.0, body, False, 0, None)
+    assert not buddy.sleep.asleep
+
+
+def test_carinho_acorda_mesmo_com_pressao_alta(buddy):
+    body = buddy.pet.body
+    body.grounded = True
+    body.held = False
+    buddy.sleep.relogio = lambda: 2.0           # madrugada, o pico de sono
+    buddy.drives.pressao = 0.9
+    buddy.sleep.tick(0.0, body, False, 0, None)
+    assert buddy.sleep.asleep
+    buddy.sleep.tick(0.0, body, False, 0, None, caressing=True)
     assert not buddy.sleep.asleep
 
 

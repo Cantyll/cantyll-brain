@@ -123,3 +123,23 @@ def test_criar_cerebro_e_escolha_pela_configuracao():
     assert config.cerebro_escolhido() == "lif"
     assert config.cerebro_escolhido("lif") == "lif"
     assert config.cerebro_escolhido("bio") == "lif"     # ainda não pronto: volta ao padrão
+
+
+def test_mesma_semente_de_ruido_mesmo_estado():
+    # determinismo: compara o estado (estado()), não os spikes
+    a = LIFBrain(seed=7, seed_ruido=42)
+    b = LIFBrain(seed=7, seed_ruido=42)
+    for brain in (a, b):
+        for _ in range(50):
+            brain.stimulate({"WORK": 0.8, "TYPING": 0.3})
+            brain.step(100)
+            brain.learn(1.0, 0.0, 0.1, 0.004)
+    assert a.estado() == b.estado()
+
+
+def test_sem_semente_de_ruido_o_padrao_continua_aleatorio():
+    a, b = LIFBrain(seed=7), LIFBrain(seed=7)
+    for brain in (a, b):
+        brain.stimulate({"WORK": 0.8, "TYPING": 0.3})
+        brain.step(500)
+    assert a.estado() != b.estado()

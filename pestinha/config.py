@@ -7,6 +7,7 @@ e é gravado a CADA mudança (se o programa cair, a escolha não se perde).
 
 import random
 
+from . import ajustes
 from .paths import pet_id_valido
 from .store import read_json, read_lines, write_json
 
@@ -152,7 +153,7 @@ PROFILES = {
         "grievance_down": 420.0,     # ignorado, a insatisfação some em ~7 min
         "stage_up": [0.12, 0.4, 0.68, 1.0],  # reclamação, manifestação, greve, revolução
         "stage_dwell": 20.0,         # s mínimos em cada estágio antes de subir (teste)
-        "sad_up": 30.0,              # tristeza: ~30 s de tristeza leva ao abandono (sozinho: ~5 min)
+        "sad_up": 30.0,              # tristeza: ~30 s de tristeza leva ao abandono (teste)
         "sad_down": 300.0,
         "sad_stage_up": [0.2, 0.5, 0.8, 1.0],
         "stage_hyst": 0.06,          # cartaz só some quando cai este tanto abaixo do limiar
@@ -181,7 +182,7 @@ PROFILES = {
         "grievance_down": 3600.0,
         "stage_up": [0.25, 0.5, 0.75, 1.0],
         "stage_dwell": 120.0,        # s mínimos em cada estágio antes de subir (normal)
-        "sad_up": 2400.0,            # tristeza: ~40 min sozinho ou triste leva ao abandono
+        "sad_up": 2400.0,            # tristeza: ~40 min de tristeza (dispensa, bolinha levada) leva ao abandono
         "sad_down": 5400.0,
         "sad_stage_up": [0.25, 0.5, 0.75, 1.0],
         "stage_hyst": 0.12,
@@ -236,6 +237,7 @@ DEFAULT_PET = {
     "brincadeira": {"bola": 1.0, "arremesso": 0.6, "postit": 0.5},   # pesos: 0 desliga
     "temperamento": {},
     "reacao_notebook": "bravo",         # o que sente se arrancarem o notebook: "bravo" ou "triste"
+    "pico_vigilia_h": ajustes.PICO_VIGILIA_H,   # h: pico de vigília; o relógio do sono gira em volta dele
 }
 
 
@@ -274,6 +276,9 @@ def _pet_valido(saved):
     temp = saved.get("temperamento")
     if isinstance(temp, dict) and all(isinstance(k, str) and _numero_ok(v) for k, v in temp.items()):
         out["temperamento"] = dict(temp)
+    pico = saved.get("pico_vigilia_h")
+    if _numero_ok(pico) and 0 <= pico < 24:
+        out["pico_vigilia_h"] = float(pico)
     if saved.get("reacao_notebook") in ("bravo", "triste"):
         out["reacao_notebook"] = saved["reacao_notebook"]
     if isinstance(saved.get("aparencia"), dict):

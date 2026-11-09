@@ -156,7 +156,8 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         self.behavior = Behavior(self.pet.body, self.pet_state, self.mischief)
 
         # ----- controladores -----
-        self.sleep = SleepController(self.emotion, self.drives, self.memory, self.debugging)
+        self.sleep = SleepController(self.emotion, self.drives, self.memory, self.debugging,
+                                     pico_h=pet_def["pico_vigilia_h"])
         self.protest_ctl = ProtestController(self.protest, self.pet.body, self.behavior,
                                              self.senses, self.drives, self.pet_state, self.debugging)
         self.sad = Protesto(self.conteudo.signs, self.pet_paths.sad_protest, kind="tristeza")
@@ -418,8 +419,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         change = self.protest_ctl.tick(dt, st.tone, self.prof, caressing, now)
         if change:
             self.protest_ctl.on_stage(*change)
-        sad_change = self.sad_ctl.tick(dt, st.tone, self.prof, caressing, now,
-                                       self.drives.channels()["LONELY"])
+        sad_change = self.sad_ctl.tick(dt, st.tone, self.prof, caressing, now)
         if sad_change:
             self.sad_ctl.on_stage(*sad_change)
         if self.asleep:
@@ -458,7 +458,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
             self.emotion.force("contente", 0.5, now, PRIORITY["carinho"])     # fecha os olhinhos na hora
             self.timeline.note_interaction(dt)
 
-        self.sleep.tick(now, body, self.in_flight, self.protest.stage, self.behavior.mission)
+        self.sleep.tick(now, body, self.in_flight, self.protest.stage, self.behavior.mission, caressing=caressing)
 
         emotion = self.emotion.update(motor, dt, self.prof)
         if self.protest.stage >= 2 and not self.asleep:
@@ -558,6 +558,8 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
     def maybe_mischief(self, now, dt, bounds, cursor, motores):
         """Decide se vai aprontar uma travessura agora (não aprontar de castigo nem dormindo)."""
         if self.castigo.dentro:                      # de castigo não apronta (e não deixa objeto solto)
+            return
+        if self.activity == "AWAY":                  # R1: ausente não apronta; nada chama atenção sem você
             return
         self.mischief_ctl.maybe_act(
             now, dt, bounds, cursor, self.pet.body, motores=motores,

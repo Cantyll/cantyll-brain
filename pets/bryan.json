@@ -2,6 +2,7 @@
   "_ajuda": "brincadeira: pesos de cada jeito de brincar (0 desliga). temperamento: DISMISS->FRUSTRATION e IMPACT->FRUSTRATION altos = mais humor bravo. reacao_notebook: \"bravo\" ou \"triste\", o que ele sente se arrancarem o notebook dele.",
   "nome": "Bryan",
   "seed": 7,
+  "pico_vigilia_h": 16,
   "temperamento": {
     "CURIOUS": 1.3,
     "PLAYFUL": 1.1,

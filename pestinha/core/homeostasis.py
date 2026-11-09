@@ -10,7 +10,8 @@ HOMEOSTASIS - variáveis internas que o pet tenta manter em equilíbrio.
 
 Os desequilíbrios entram na rede como sentidos internos (interocepção):
     pouca estimulação -> BOREDOM  (explora, fica curioso/brincalhão)
-    muito carente     -> LONELY   (fica triste)
+    muito carente     -> LONELY   (cansa de esperar: leva a repouso, nunca a tristeza; R1)
+    pressão de sono   -> o ritmo.py decide quando dormir (P sobe acordado, cai dormindo)
     pouca energia     -> FATIGUE  (fica sonolento; abaixo do limite, dorme)
 Ou seja: nenhum timer manda ele explorar ou ficar triste; ele tenta
 recuperar o equilíbrio.
@@ -18,8 +19,10 @@ recuperar o equilíbrio.
 
 import time
 
+from .. import ajustes
 from ..mathutil import clamp, valor_real
 from ..store import read_json, write_json
+from .ritmo import avancar_pressao
 
 SLEEP_BELOW = 0.18          # energia abaixo disso: dorme (se puder)
 WAKE_ABOVE = 0.6            # energia acima disso: acorda sozinho (antes 0,95: dormia quase até o fim)
@@ -40,10 +43,11 @@ CONTACT = {"poke": 0.15, "drag": 0.1, "throw": 0.1, "caress": 0.25, "dismiss": 0
 class Drives:
     """Necessidades internas do pet: energia (cansaço), estimulação (tédio) e contato (carência). Elas sobem e descem com o tempo e com o que você faz."""
     def __init__(self):
-        """Começa com energia cheia, estimulação média e contato alto."""
+        """Começa com energia cheia, estimulação média e contato alto. A pressão de sono começa baixa (acabou de acordar)."""
         self.energy = 1.0
         self.stimulation = 0.6
         self.contact = 0.0
+        self.pressao = ajustes.PRESSAO_INICIAL     # P: adenosina, 0 a 1; decide o sono junto com o relógio (ritmo.py)
 
     # ---------------- acontecimentos ----------------
 
@@ -59,6 +63,7 @@ class Drives:
 
     def update(self, dt, prof, asleep, moving, arousal, user_away, engaged=False, preso=False, visitado=False):
         """Um passo do tempo: cansa quando acordado e parado, recupera dormindo, e o tédio e a carência crescem sem atenção."""
+        self.pressao = avancar_pressao(self.pressao, dt, asleep)
         if asleep:
             self.energy = clamp(self.energy + dt / prof["sleep_recover"])
         else:
@@ -99,7 +104,7 @@ class Drives:
     def save(self, path):
         """Grava energia, estimulação e contato em drives.json."""
         data = {"energy": self.energy, "stimulation": self.stimulation,
-                "contact": self.contact, "saved_at": time.time()}
+                "contact": self.contact, "pressao": round(self.pressao, 6), "saved_at": time.time()}
         write_json(path, data)
 
     def load(self, path, prof):
@@ -112,9 +117,11 @@ class Drives:
             energy = valor_real(data.get("energy", 1.0), 0.0, 1.0)
             stimulation = valor_real(data.get("stimulation", 0.6), 0.0, 1.0)
             contact = valor_real(data.get("contact", 0.0), 0.0, 1.0)
+            pressao = valor_real(data.get("pressao", ajustes.PRESSAO_INICIAL), 0.0, 1.0)
         except (TypeError, ValueError):
             return False                        # arquivo com tipos errados: fica com os valores iniciais
         self.energy = clamp(energy + elapsed / prof["sleep_recover"])
         self.stimulation = clamp(stimulation - elapsed / prof["stim_decay"])
         self.contact = clamp(contact + 0.3 * elapsed / prof["contact_span"])
+        self.pressao = pressao                  # fechado não avança: a pausa congela P (spec, seção 6)
         return True

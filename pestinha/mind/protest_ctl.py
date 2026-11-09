@@ -40,10 +40,10 @@ class ProtestController:
 
     # ---------------- estágios ----------------
 
-    def tick(self, dt, tone, prof, caressing, now, lonely=0.0):
+    def tick(self, dt, tone, prof, caressing, now):
         """Integra a intensidade do sentimento. Devolve (antigo, novo) quando o estágio muda."""
         if self.protest.kind == "tristeza":
-            rate = tone.r["SAD"] + 0.5 * lonely          # triste + sozinho por muito tempo
+            rate = tone.r["SAD"]                         # R1: sozinho não entra; só a rede triste sobe a tristeza
             prof = dict(prof, grievance_up=prof["sad_up"], grievance_down=prof["sad_down"],
                         stage_up=prof["sad_stage_up"])
         else:

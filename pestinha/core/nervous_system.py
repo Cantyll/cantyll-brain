@@ -176,7 +176,7 @@ CONNECTIONS = [
     ("DISMISS", "FRUSTRATION", 0.12, 0.6),
     ("DISMISS", "ALERT",   0.03, 0.6),
     ("DISMISS", "GLOOM",   0.03, 0.6),
-    ("LONELY",  "GLOOM",   0.08, 0.6),
+    ("LONELY",  "TIRED",   0.08, 0.6),     # R1: ausência cansa de esperar; leva a repouso, nunca a tristeza
     ("LONELY",  "QUIET",   0.03, 0.6),
     ("CARESS",  "CALM",    0.07, 0.6),
     ("ANTICIPATE", "ALERT",  0.12, 0.6),     # reage ao que costuma vir
@@ -197,7 +197,7 @@ CONNECTIONS = [
     ("BOREDOM", "PLAYFUL", 0.09, 0.6),
 
     # interneurônios entre si
-    ("TIRED",   "GLOOM",   0.03, 0.5),
+    ("TIRED",   "GLOOM",   0.0,  0.5),     # R1: era 0,03 (cansaço levava à tristeza). Peso 0 mantém o sorteio dos pesos seguintes
     ("FRUSTRATION", "INHIB",   0.04, 0.5),
     ("FRUSTRATION", "CALM",   -0.06, 0.5),
     ("FRUSTRATION", "PLAYFUL", -0.05, 0.5),
@@ -261,8 +261,8 @@ CONNECTIONS = [
     ("CALM",    "FUGIR",  -0.30, 0.5),
     ("FRUSTRATION", "CARTAZ", 0.25, 0.6),
     ("CALM",    "CARTAZ", -0.20, 0.5),
-    ("GLOOM",   "CANTO",   0.50, 0.6),      # triste: vai para o cantinho
-    ("TIRED",   "CANTO",   0.05, 0.5),
+    ("GLOOM",   "CANTO",   0.50, 0.6),      # triste (por ignorado, dispensa ou bolinha levada): vai para o cantinho
+    ("TIRED",   "CANTO",   0.0,  0.5),      # R1: era 0,05 (cansaço levava ao cantinho). Peso 0 mantém o sorteio dos pesos seguintes
     ("BOREDOM", "TRAVESSURA", 0.30, 0.6),   # entediado apronta
     ("CURIOUS", "TRAVESSURA", 0.20, 0.6),
     ("PLAYFUL", "TRAVESSURA", 0.12, 0.6),
@@ -380,8 +380,10 @@ class LIFBrain(Brain):
     """Rede neural pulsada (neurônios de integração e disparo com vazamento). A mesma estrutura para todos os pets; a semente e o temperamento dão o 'indivíduo'."""
     SEED = 7                    # outra semente = outro "indivíduo"
 
-    def __init__(self, seed=None, temperament=None):
+    def __init__(self, seed=None, temperament=None, seed_ruido=None):
         """
+        seed_ruido: None (padrão) = ruído sempre diferente. Um número deixa o ruído reprodutível,
+        para testes de determinismo; o padrão do programa não muda.
         temperament: {interneurônio: ganho} ou {"PRE->POS": ganho}.
         Multiplica as sinapses que saem dos SENSORES, então o mesmo
         estímulo (ex.: DRAG) pesa diferente em cada pet.
@@ -389,7 +391,7 @@ class LIFBrain(Brain):
         self.seed = self.SEED if seed is None else seed
         self.temperament = dict(temperament or {})
         rng = np.random.default_rng(self.seed)
-        self.rng = np.random.default_rng()          # ruído: sempre diferente
+        self.rng = np.random.default_rng(seed_ruido)  # ruído: sempre diferente (seed_ruido=None)
 
         # ---------------- populações ----------------
         self.pools = []                             # dicts com start/n/group
