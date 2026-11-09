@@ -147,7 +147,7 @@ def test_sem_semente_de_ruido_o_padrao_continua_aleatorio():
 
 
 def _rodar_ausencia(seed, ausente):
-    """Ausência longa, em regime: carência e tédio no máximo, silêncio total. Devolve a média dos últimos 30 s."""
+    """Ausência longa, com carência e tédio no máximo e silêncio total. Devolve a média dos últimos 3 s (após 8 s de aquecimento)."""
     b = LIFBrain(seed=seed, seed_ruido=42)
     b.definir_ausencia(ausente)
     d = Drives()
