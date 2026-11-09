@@ -1,0 +1,12 @@
+Pestinha (repositório cantyll-brain)
+
+Licença: GNU General Public License v3.0 ou posterior (GPL-3.0-or-later). O texto está em LICENSE.
+
+Copyright (c) 2026, Cantyll: modificações e este repositório.
+
+Código original: o pacote Pestinha 0.8.0 importado (commit 91e0c59) não traz avisos de autoria por arquivo
+e não identifica os autores originais. Se você souber quem são, acrescente o nome e o ano aqui, sem
+remover o aviso acima.
+
+A versão anterior deste arquivo, BSD-3-Clause, continua no histórico do git (commit 4f20932). Ela não se
+aplica ao código importado.
