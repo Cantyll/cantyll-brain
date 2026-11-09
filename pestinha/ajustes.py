@@ -147,6 +147,11 @@ LIMIAR_ACORDA_C = 0.6           # ou se estiver no pico de vigília (C > isso) c
 LIMIAR_ACORDA_PRESSAO_DIA = 0.5
 
 # ---------------------------------------------------------------------------
+# Ausência (R1): modulador da rede, não sensor (core/nervous_system.py, definir_ausencia)
+# ---------------------------------------------------------------------------
+AUSENCIA_CORRENTE = 0.2         # corrente inibitória por ms em FUGIR e TRAVESSURA quando você está ausente (limiar de disparo: 1,0)
+
+# ---------------------------------------------------------------------------
 # Validação
 # ---------------------------------------------------------------------------
 

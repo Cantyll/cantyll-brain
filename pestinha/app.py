@@ -407,6 +407,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         intensities["RECUSA"] = self.pulso_recusa
         self.pulso_recusa = 0.0
         total_ms = max(1, round(dt * 1000))
+        self.brain.definir_ausencia(self.activity == "AWAY")   # R1: ausente, a rede segura fuga e travessura
         while total_ms > 0:
             chunk = min(100, total_ms)
             self.brain.stimulate(intensities)

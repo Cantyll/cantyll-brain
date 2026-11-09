@@ -43,6 +43,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from ..ajustes import AUSENCIA_CORRENTE
 from ..mathutil import valor_real
 from ..store import read_json, write_json
 
@@ -323,6 +324,9 @@ class Brain(ABC):
     def step(self, dt_ms):
         """Avança a simulação por dt_ms milissegundos."""
 
+    def definir_ausencia(self, ausente):
+        """Liga ou desliga o modulador de ausência (R1). Cérebro que não tem o modulador ignora."""
+
     @abstractmethod
     def motor_activity(self):
         """{motor: taxa de disparo suavizada, em Hz por neurônio}"""
@@ -422,6 +426,14 @@ class LIFBrain(Brain):
         self.N = cursor
         self.Ns = sum(p["n"] for p in self.pools if p["group"] == "sensory")
         self.Nl = self.N - self.Ns
+
+        # modulador de ausência (R1): sem você, FUGIR e TRAVESSURA recebem corrente inibitória.
+        # Não é sensor e não sorteia nada: o sorteio da rede e o comportamento com você presente ficam iguais.
+        self.ausente = False
+        self._idx_ausencia = np.concatenate([
+            np.arange(p["start"] - self.Ns, p["start"] - self.Ns + p["n"])
+            for p in (self.pool("FUGIR"), self.pool("TRAVESSURA"))
+        ])
 
         self.sensory_names = list(SENSORY_SPEC.keys())
         self.motor_names = [m[0] for m in MOTOR_SPEC]
@@ -567,6 +579,10 @@ class LIFBrain(Brain):
 
     # ---------------- interface ----------------
 
+    def definir_ausencia(self, ausente):
+        """R1: com o usuário ausente, FUGIR e TRAVESSURA recebem corrente inibitória (AUSENCIA_CORRENTE)."""
+        self.ausente = bool(ausente)
+
     def stimulate(self, intensities):
         """Recebe a intensidade (0 a 1) de cada canal sensorial e converte em probabilidade de disparo, com habituação."""
         self.s_prob[:] = 0.0
@@ -589,6 +605,8 @@ class LIFBrain(Brain):
         v *= self.decay
         v += drive
         v += NOISE_SIGMA * rng.standard_normal(self.Nl)
+        if self.ausente:                                  # R1: sem você, a vontade de fugir e a travessura ficam quietas
+            v[self._idx_ausencia] -= AUSENCIA_CORRENTE
 
         in_ref = self.ref > 0
         v[in_ref] = 0.0

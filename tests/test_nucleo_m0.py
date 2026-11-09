@@ -13,6 +13,7 @@ import pytest
 from pestinha import config
 from pestinha.core import nervous_system as ns
 from pestinha.core.nervous_system import Brain, LIFBrain, criar_cerebro
+from pestinha.core.homeostasis import Drives
 
 
 def test_expected_zero_reproduz_a_recompensa_bruta_de_antes():
@@ -143,3 +144,41 @@ def test_sem_semente_de_ruido_o_padrao_continua_aleatorio():
         brain.stimulate({"WORK": 0.8, "TYPING": 0.3})
         brain.step(500)
     assert a.estado() != b.estado()
+
+
+def _rodar_ausencia(seed, ausente):
+    """Ausência longa, em regime: carência e tédio no máximo, silêncio total. Devolve a média dos últimos 30 s."""
+    b = LIFBrain(seed=seed, seed_ruido=42)
+    b.definir_ausencia(ausente)
+    d = Drives()
+    d.contact, d.stimulation, d.energy = 1.0, 0.0, 0.5
+    soma, n = {}, 0
+    for t in range(110):
+        ch = d.channels()
+        ch["SILENCE"] = 1.0
+        b.stimulate(ch)
+        b.step(100)
+        if t >= 80:
+            for k, v in b.motor_activity().items():
+                soma[k] = soma.get(k, 0.0) + v
+            n += 1
+    return {k: v / n for k, v in soma.items()}
+
+
+def test_ausencia_segura_fugir_e_travessura_sem_mexer_no_repouso():
+    # R1: sem você, FUGIR e TRAVESSURA quase param na rede; o repouso continua subindo; ninguém fica triste
+    for seed in (7, 1729):
+        com = _rodar_ausencia(seed, True)
+        sem = _rodar_ausencia(seed, False)
+        assert sem["FUGIR"] > 2.0                       # sem o modulador, a fuga passa do limiar (como antes)
+        assert com["FUGIR"] < 0.5
+        assert com["TRAVESSURA"] < 0.2 * sem["TRAVESSURA"]
+        assert com["DROWSE"] >= 0.9 * sem["DROWSE"]
+        assert com["SAD"] == 0.0 and com["CANTO"] == 0.0
+
+
+def test_modulador_de_ausencia_desligado_e_o_padrao():
+    b = LIFBrain(seed=7)
+    assert b.ausente is False
+    b.definir_ausencia(False)
+    assert b.ausente is False
