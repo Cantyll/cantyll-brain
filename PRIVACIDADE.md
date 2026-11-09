@@ -35,7 +35,7 @@ De cada personagem, em `memory/pets/<pet>/` (um personagem não lê a memória d
 | `nervous.json` | Estado da rede neural (habituação e aprendizado) |
 | `episodes.jsonl`, `preferences.json` | Resultado de cada travessura e preferências aprendidas |
 | `conditioning.json` | O que ele aprendeu a antecipar |
-| `drives.json` | Energia, estimulação e carência |
+| `drives.json` | Energia, estimulação, carência e pressão de sono |
 | `protest.json`, `sad_protest.json` | Insatisfação e tristeza |
 | `castigo.json` | Fugas do cantinho, rancor e receio |
 | `.migrado` | Só existe se a memória veio da versão antiga: quando migrou e o hash de cada arquivo |

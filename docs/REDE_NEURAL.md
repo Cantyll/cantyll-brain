@@ -2,7 +2,7 @@
 
 > Gerado por `ferramentas/gerar_doc_rede.py` a partir do código. Não edite à mão: rode o script.
 
-A rede tem **470 neurônios** de integração e disparo com vazamento (LIF), **15939 sinapses**, **30 canais sensoriais**, **10 populações de interneurônios** e **15 populações motoras**.
+A rede tem **470 neurônios** de integração e disparo com vazamento (LIF), **15808 sinapses**, **30 canais sensoriais**, **10 populações de interneurônios** e **15 populações motoras**.
 
 ## Como o sinal anda
 
@@ -69,11 +69,11 @@ computador e você ──► sentidos (0..1) ──► neurônios sensoriais (Po
 | `CURIOUS` | curiosidade | excitatória | 16 | BOREDOM (+0.12), NOVELTY (+0.10), DRAG (+0.07), WEB (+0.06), TOY_NEAR (+0.06), POKE (+0.05), ALERT (+0.05), QUIET (−0.05), SOCIAL (+0.04), GLOOM (−0.04), TIRED (−0.04), THROW (+0.03), INHIB (−0.03) |
 | `PLAYFUL` | brincadeira | excitatória | 12 | TOY_NEAR (+0.10), BOREDOM (+0.09), PLAY (+0.08), POKE (+0.08), THROW (+0.08), GLOOM (−0.06), DRAG (+0.05), CARESS (+0.05), FRUSTRATION (−0.05), TIRED (−0.05), INHIB (−0.03), SOUND (+0.02) |
 | `CALM` | calma | excitatória | 12 | CARESS (+0.07), SOUND (+0.06), FRUSTRATION (−0.06), VISITA (+0.05), WORK (+0.03), SILENCE (+0.03) |
-| `TIRED` | cansaço | excitatória | 12 | FATIGUE (+0.08), SILENCE (+0.06) |
+| `TIRED` | cansaço | excitatória | 12 | FATIGUE (+0.08), LONELY (+0.08), SILENCE (+0.06) |
 | `QUIET` | quietude | inibitória | 12 | SILENCE (+0.08), FATIGUE (+0.03), LONELY (+0.03) |
 | `INHIB` | inibição | inibitória | 20 | ALERT (+0.10), FOCUS (+0.06), CURIOUS (+0.06), PLAYFUL (+0.06), FRUSTRATION (+0.04) |
 | `FRUSTRATION` | frustração | excitatória | 12 | RECUSA (+0.25), CARTAZ (−0.20), DISMISS (+0.12), TOY_TAKEN (+0.10), PRESO (+0.10), IMPACT (+0.06), RANCOR (+0.04), DRAG (+0.03), CALM (−0.03) |
-| `GLOOM` | desânimo | excitatória | 12 | TOY_TAKEN (+0.10), VISITA (−0.10), LONELY (+0.08), PLAYFUL (−0.05), RECUSA (+0.05), RECEIO (+0.04), DISMISS (+0.03), TIRED (+0.03), IMPACT (+0.02) |
+| `GLOOM` | desânimo | excitatória | 12 | TOY_TAKEN (+0.10), VISITA (−0.10), PLAYFUL (−0.05), RECUSA (+0.05), RECEIO (+0.04), DISMISS (+0.03), IMPACT (+0.02) |
 
 ## Motores
 
@@ -90,7 +90,7 @@ computador e você ──► sentidos (0..1) ──► neurônios sensoriais (Po
 | `SENTAR` | decisão | sentar no notebook | GLOOM (−0.60), PEDIDO (+0.55), FOCUS (+0.45), PLAYFUL (−0.40), FRUSTRATION (−0.35), PRESO (−0.30), RANCOR (−0.30), CURIOUS (−0.25), ALERT (−0.10) | quer trabalhar no notebook |
 | `FUGIR` | decisão | fugir do canto | RECEIO (−0.40), FRUSTRATION (+0.35), LEMBRA_FUGA (+0.30), CALM (−0.30), ANTECIPA_PLACA (+0.15), BOREDOM (+0.15) | tenta escapar do cantinho |
 | `CARTAZ` | decisão | colar cartaz | FRUSTRATION (+0.25), CALM (−0.20) | cola um cartaz de protesto |
-| `CANTO` | decisão | ir para o cantinho | GLOOM (+0.50), TIRED (+0.05) | vai para o cantinho |
+| `CANTO` | decisão | ir para o cantinho | GLOOM (+0.50) | vai para o cantinho |
 | `TRAVESSURA` | decisão | aprontar | PLACA (−0.60), GLOOM (−0.50), BOREDOM (+0.30), CALM (−0.30), CURIOUS (+0.20), RANCOR (+0.15), PLAYFUL (+0.12) | apronta uma travessura (a taxa vira a frequência) |
 | `PAPEL` | decisão | atirar papel | FRUSTRATION (+0.40), CALM (−0.40) | atira bolinha de papel (na revolução) |
 | `ACEITAR` | decisão | aceitar o castigo | CALM (+0.45), FRUSTRATION (−0.40), CARESS (+0.30), RANCOR (−0.20), VISITA (+0.08) | aceita o castigo e sai do canto por conta própria (perdão) |
@@ -109,4 +109,4 @@ Os motores de decisão viram comportamento assim (valores em `pestinha/ajustes.p
 | Cartazes do castigo | por segundo: taxa de `CARTAZ` × 0.5 (cada um fica ao menos 8 s). |
 | Bolinhas de papel | por segundo: taxa de `PAPEL` × 0.05 (só na revolução). |
 
-Regras que ainda não são da rede: as condições do corpo (dormindo, segurado, no ar), os estágios do protesto (acúmulo com limiar), o sono pela energia e a escolha do tipo de travessura (memória episódica).
+Regras que ainda não são da rede: as condições do corpo (dormindo, segurado, no ar), os estágios do protesto (acúmulo com limiar), o sono pela pressão de sono e pelo relógio (`core/ritmo.py`) e a escolha do tipo de travessura (memória episódica).

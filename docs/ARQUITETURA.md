@@ -83,7 +83,7 @@ As decisões de comportamento saem dos motores de decisão da rede (tabela em
 
 - condições do corpo (dormindo, segurado, no ar, em missão);
 - estágios do protesto (acúmulo de insatisfação com limiar);
-- sono pela energia;
+- sono pela pressão de sono e pelo relógio (`core/ritmo.py`, `mind/sleep.py`); a energia continua como drive, mas não manda no sono;
 - qual travessura fazer (memória episódica com bandit contextual).
 
 ## Aprendizado

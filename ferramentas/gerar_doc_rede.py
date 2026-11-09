@@ -34,7 +34,7 @@ def comentarios_motores():
 
 
 def entradas_de(pos):
-    pares = [(pre, w) for pre, alvo, w, _d in ns.CONNECTIONS if alvo == pos]
+    pares = [(pre, w) for pre, alvo, w, _d in ns.CONNECTIONS if alvo == pos and w != 0]   # peso 0: linha só para manter o sorteio
     return ", ".join(f"{pre} ({'+' if w > 0 else '−'}{abs(w):.2f})" for pre, w in sorted(pares, key=lambda p: -abs(p[1])))
 
 
@@ -108,7 +108,8 @@ def main():
         f"| Bolinhas de papel | por segundo: taxa de `PAPEL` × {ajustes.GANHO_PAPEL:g} (só na revolução). |",
         "",
         "Regras que ainda não são da rede: as condições do corpo (dormindo, segurado, no ar), os estágios do "
-        "protesto (acúmulo com limiar), o sono pela energia e a escolha do tipo de travessura (memória episódica).",
+        "protesto (acúmulo com limiar), o sono pela pressão de sono e pelo relógio (`core/ritmo.py`) e a escolha do tipo "
+        "de travessura (memória episódica).",
         "",
     ]
     destino = RAIZ / "docs" / "REDE_NEURAL.md"

@@ -1,5 +1,22 @@
 # Histórico de versões
 
+## Não lançado — núcleo biológico (M0) e R1
+
+### Mudanças de comportamento
+- Ausência não deixa mais o pet triste. A carência (`LONELY`) leva a cansaço e quietude, não à tristeza. Cansaço deixou de levar à tristeza e ao cantinho.
+- A tristeza vem só da rede triste: travessura dispensada, bolinha levada, pancada forte, pedido recusado e fuga do cantinho que deu errado. O protesto de tristeza sobe só com ela.
+- Ausente (sem atividade além do limite), ele não apronta travessuras.
+- O sono deixou de depender da energia. Agora dorme quando a pressão de sono (horas acordado) está alta e o relógio marca a noite. Com o pico de vigília às 16 h (padrão), dorme por volta das 21 h e acorda por volta das 7 h. Carinho acorda na hora. De dia, só dorme se a pressão passar de 0,95.
+- `pets/*.json` aceita `pico_vigilia_h` (de 0 a 24). Bryan e Jorge usam 16.
+- Jorge perdeu o temperamento `LONELY->GLOOM`, porque essa ligação deixou de existir.
+- A rede tem 15808 sinapses (antes 15939, semente 7): saíram as ligações de cansaço para tristeza e para o cantinho.
+
+### Novidades internas
+- Licença GPL-3.0-or-later, com o arquivo `NOTICE`.
+- Interface `Brain` com `learn` (erro de predição), `avancar`, `estado` e versão. `criar_cerebro` escolhe o cérebro pela configuração; hoje só existe `lif`.
+- `LIFBrain(seed_ruido=...)`: com semente, o ruído se repete. Sem semente, continua aleatório, como antes.
+- `drives.json` ganha `pressao`. Arquivo antigo carrega com o valor inicial (0,3).
+
 ## 0.8.0 — melhorias para o Windows
 
 ### Correções

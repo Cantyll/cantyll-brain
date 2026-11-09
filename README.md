@@ -42,9 +42,9 @@ Para criar um, veja [pets/README.md](pets/README.md).
 | **Notebook** | Quando você trabalha (VS Code, Visual Studio, PyCharm, Claude, Codex), ele pode sentar atrás do notebook e trabalhar junto. Você também pode pedir; ele decide se quer. |
 | **Travessuras** | Traz memes, fotos e post-its para a tela. Com que frequência é decidido pela rede (tédio, curiosidade). |
 | **Protesto** | Bravo por muito tempo: reclamação, manifestação, greve e revolução contra o cursor, com cartazes e bolinhas de papel. |
-| **Tristeza** | Sozinho ou ignorado, fica triste, vai para o cantinho e cola bilhetes tristes. |
+| **Tristeza** | Fica triste, por exemplo, quando você dispensa a travessura dele ou leva a bolinha embora: vai para o cantinho e cola bilhetes tristes. Ficar sozinho não o deixa triste: ele cansa, fica quieto e dorme (ver Sono). |
 | **Cantinho do castigo** | Uma placa que você arrasta para onde quiser. Solte ele na frente dela e ele fica de castigo: olha para você, vira de costas, xinga em cartazes e, se a frustração durar, foge. Carinho faz ele perdoar. |
-| **Sono e fogos** | Dorme quando a energia acaba. Muito feliz, solta fogos de artifício. |
+| **Sono e fogos** | Dorme à noite, quando a pressão de sono (horas acordado) e o relógio pedem: a vigília é maior no fim da tarde (pico às 16 h) e ele dorme por volta das 21 h, acordando por volta das 7 h. Carinho acorda na hora. Muito feliz, solta fogos de artifício. |
 
 Tudo o que ele aprende (carinho, condicionamento, o que deu certo nas travessuras, fugas do castigo)
 fica salvo localmente e muda o jeito dele com o tempo.
