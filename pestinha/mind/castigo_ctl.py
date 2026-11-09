@@ -257,7 +257,7 @@ class CastigoController:
         """0..1 para a rede (LEMBRA_FUGA): cada fuga que deu certo deixa a fuga mais fácil."""
         return min(1.0, MEMORIA_POR_FUGA * self.vitorias["fugir"])
 
-    def act(self, now, body, bounds, cursor, state, motores, asleep=False):
+    def act(self, now, body, bounds, cursor, state, motores, asleep=False, ausente=False):
         """Um passo do castigo a cada tick: prende/solta, controla fugas e cartazes, e atualiza o rancor."""
         dt = min(0.5, now - self.ultimo) if self.ultimo is not None else 0.0
         self.ultimo = now
@@ -291,7 +291,7 @@ class CastigoController:
             self.ultimo_topo = now
         self._posicionar_cartaz(body)
         if not asleep:                                 # dormindo, ele não cola cartaz nem foge
-            self._decidir(now, dt, body, bounds, motores)
+            self._decidir(now, dt, body, bounds, motores, ausente=ausente)
         if self.dentro:
             self._aplicar(body, cursor, state, bounds, motores)
 
@@ -325,7 +325,7 @@ class CastigoController:
         if self.debug():
             log("[castigo] entrou no canto")
 
-    def _decidir(self, now, dt, body, bounds, motores):
+    def _decidir(self, now, dt, body, bounds, motores, ausente=False):
         """
         Perdão: ACEITAR acima do limiar, ele sai sozinho (sem contar fuga) e o rancor cai pela metade.
         Cartaz: sorteio com a frequência do disparo de CARTAZ. Fuga: quando FUGIR passa do limiar.
@@ -347,7 +347,7 @@ class CastigoController:
             self.cartaz.show()
             if self.debug():
                 log("[castigo] colou um cartaz")
-        fugir = motores.get("FUGIR", 0.0)
+        fugir = 0.0 if ausente else motores.get("FUGIR", 0.0)   # R1: sem você, a vontade de fugir não sobe
         self.vontade_fuga = max(0.0, self.vontade_fuga + dt * (fugir - LIMIAR_FUGA_HZ) / CARGA_FUGA_HZ_S)
         if self.vontade_fuga >= 1.0:                   # vontade sustentada, não um pico
             if self.debug():

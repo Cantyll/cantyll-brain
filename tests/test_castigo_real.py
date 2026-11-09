@@ -90,6 +90,18 @@ def test_cartaz_do_castigo_e_xingamento_quando_bravo(mundo):
     assert textos & set(b.castigo.xingamentos)
 
 
+def test_ausente_no_canto_nao_junta_vontade_de_fugir(mundo):
+    """R1: sem você por perto, FUGIR não enche a vontade; ele fica no canto, quieto."""
+    b = mundo.b
+    mundo.soltar()
+    b.castigo._decidir(time.monotonic(), 0.1, b.pet.body, b.bounds(), {"FUGIR": 30.0})
+    assert b.castigo.dentro
+    for _ in range(400):                              # ~25 s de vontade alta, com você ausente
+        b.castigo._decidir(time.monotonic(), 0.1, b.pet.body, b.bounds(), {"FUGIR": 15.0}, ausente=True)
+    assert b.castigo.dentro and b.castigo.fuga is None
+    assert b.castigo.vontade_fuga < 0.1
+
+
 def test_pico_de_fuga_nao_basta_mas_vontade_sustentada_foge(mundo):
     b = mundo.b
     mundo.soltar()

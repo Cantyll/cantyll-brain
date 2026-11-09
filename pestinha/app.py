@@ -502,7 +502,8 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         motores = self.brain.motor_activity()
         self.behavior.canto = motores["CANTO"] >= LIMIAR_CANTO_HZ
         self.behavior.tick(dt, now, cursor, bounds, self.prof, self.platforms)
-        self.castigo.act(now, body, bounds, cursor, self.pet_state, motores, asleep=self.asleep)
+        self.castigo.act(now, body, bounds, cursor, self.pet_state, motores, asleep=self.asleep,
+                         ausente=self.activity == "AWAY")          # R1: ausente não tenta fugir
         preso = self.castigo.dentro                  # no cantinho, nada de greve
         if self.protest.stage == 0:
             self.sad_ctl.carry(now, self.asleep or preso)
