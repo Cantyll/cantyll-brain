@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Pestinha: antes e depois</title>
+<meta name="description" content="Como a rede neural do Pestinha funcionava antes e como fica depois do PR #1, com o que já está no código, o que está só preparado e o que ainda falta.">
+<style>
+:root {
+  --bg: #0b0f14;
+  --surf: #131a22;
+  --surf2: #1b2430;
+  --line: #2c3848;
+  --line-ui: #8fa0b5;
+  --txt: #e8edf3;
+  --mut: #b8c3d1;
+  --azul: #9ccbff;
+  --verde: #7fe3b2;
+  --ambar: #ffd27a;
+  --verm: #ffa3a3;
+  --roxo: #d2c2ff;
+  --cinza: #c3ccd8;
+}
+:root:not([data-theme="light"]) { color-scheme: dark; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--txt);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+main { max-width: 980px; margin: 0 auto; padding: 0 16px 64px; }
+h1 { font-size: clamp(1.6rem, 4vw, 2.3rem); line-height: 1.2; margin: 28px 0 10px; }
+h2 { font-size: 1.35rem; line-height: 1.3; margin: 0 0 12px; }
+h3 { font-size: 1.05rem; margin: 0 0 6px; }
+p { margin: 0 0 12px; }
+ul { margin: 0 0 12px; padding-left: 20px; }
+li { margin-bottom: 6px; }
+a { color: var(--azul); }
+.lead { color: var(--mut); font-size: 1.05rem; }
+.nota { color: var(--mut); font-size: .92rem; }
+section {
+  background: var(--surf);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  margin: 18px 0;
+}
+nav ul { columns: 2; list-style: none; padding: 0; margin: 0; }
+nav li { margin: 0 0 6px; break-inside: avoid; }
+nav a { text-decoration: none; }
+nav a:hover, nav a:focus-visible { text-decoration: underline; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .9em;
+  background: var(--surf2);
+  color: var(--txt);
+  padding: 1px 6px;
+  border-radius: 6px;
+  word-break: break-word;
+}
+.chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: .82rem;
+  font-weight: 700;
+  line-height: 1.6;
+  color: #0b0f14;
+  margin: 2px 6px 2px 0;
+  vertical-align: middle;
+}
+.c-ok { background: var(--verde); }
+.c-pronto { background: var(--ambar); }
+.c-desvio { background: var(--azul); }
+.c-confirmar { background: var(--roxo); }
+.c-ajuste { background: #ffb86b; }
+.c-pend { background: var(--cinza); outline: 2px dashed var(--line-ui); outline-offset: 2px; }
+.legenda { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card {
+  background: var(--surf2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+}
+.card.pend { border: 2px dashed var(--line-ui); background: var(--surf); }
+.analogia {
+  border-left: 4px solid var(--azul);
+  background: var(--surf2);
+  color: var(--mut);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.alerta {
+  border-left: 4px solid var(--roxo);
+  background: var(--surf2);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.tabela-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--mut); font-weight: 600; }
+td.num { white-space: nowrap; }
+
+/* ---------- seletor Antes / Depois (sem JavaScript) ---------- */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.seletor {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line-ui);
+  border-radius: 999px;
+  background: var(--surf2);
+  margin-bottom: 12px;
+}
+.seletor label {
+  cursor: pointer;
+  padding: 8px 18px;
+  border-radius: 999px;
+  color: var(--mut);
+  font-weight: 700;
+}
+#v-antes:checked ~ .seletor label[for="v-antes"],
+#v-depois:checked ~ .seletor label[for="v-depois"] {
+  background: var(--txt);
+  color: #0b0f14;
+}
+#v-antes:focus-visible ~ .seletor label[for="v-antes"],
+#v-depois:focus-visible ~ .seletor label[for="v-depois"] {
+  outline: 3px solid var(--azul);
+  outline-offset: 2px;
+}
+#v-depois:checked ~ .diagrama .so-antes { display: none; }
+#v-antes:checked ~ .diagrama .so-depois { display: none; }
+#v-antes:checked ~ .so-depois-texto { display: none; }
+#v-depois:checked ~ .so-antes-texto { display: none; }
+
+/* ---------- diagrama da rede ---------- */
+.diagrama { margin: 0; }
+.diagrama svg { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; }
+.diagrama svg text { font-family: inherit; }
+.no rect { fill: var(--surf2); stroke: var(--line-ui); stroke-width: 1.5; }
+.no.ausencia rect { stroke: var(--roxo); stroke-width: 2; }
+.no text { fill: var(--txt); font-size: 18px; font-weight: 600; text-anchor: middle; }
+.no text.sub { font-size: 15px; font-weight: 400; fill: var(--mut); }
+.aresta { fill: none; }
+.aresta.azul { stroke: var(--azul); }
+.aresta.verm { stroke: var(--verm); }
+.aresta.verde { stroke: var(--verde); }
+.aresta.roxo { stroke: var(--roxo); stroke-dasharray: 6 6; }
+.fluxo { stroke-dasharray: 4 12; animation: fluxo 1.8s linear infinite; }
+.aresta.roxo.fluxo { stroke-dasharray: 6 6; animation: none; }
+.rotulo-svg { fill: var(--mut); font-size: 14px; }
+.legenda-rede { display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); margin: 14px 0 6px; font-size: .95rem; list-style: none; padding: 0; }
+.swatch { display: inline-block; width: 26px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 8px; }
+.swatch.azul { border-color: var(--azul); }
+.swatch.verm { border-color: var(--verm); }
+.swatch.verde { border-color: var(--verde); }
+.swatch.roxo { border-color: var(--roxo); border-top-style: dashed; }
+
+/* ---------- barras (taxas e custo) ---------- */
+.linha { display: grid; grid-template-columns: minmax(120px, 210px) 1fr; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
+.linha .rotulo { font-size: .95rem; }
+.trilha {
+  position: relative;
+  height: 22px;
+  background: var(--surf2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.barra {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: var(--w);
+  border-radius: 5px 0 0 5px;
+  animation: crescer 1.3s ease-out both;
+}
+.barra.antes { background: var(--verm); }
+.barra.depois { background: var(--verde); }
+.barra.custo { background: var(--azul); }
+.valor { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: .85rem; color: #0b0f14; font-weight: 700; white-space: nowrap; }
+.trilha .valor-fora { position: absolute; left: calc(var(--w) + 6px); top: 50%; transform: translateY(-50%); font-size: .85rem; color: var(--txt); font-weight: 600; white-space: nowrap; }
+.marca { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--roxo); }
+
+/* ---------- animações ---------- */
+@keyframes crescer { from { width: 0; } to { width: var(--w); } }
+@keyframes fluxo { to { stroke-dashoffset: -32; } }
+@keyframes desenha { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+@keyframes agora { from { transform: translate(0px, 0px); } to { transform: translate(560px, 0px); } }
+@keyframes pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.dia-p { stroke-dasharray: 1000; animation: desenha 2.6s ease-out both; }
+.agora-linha { animation: agora 24s linear infinite; }
+.pulsa { animation: pulsa 2.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media (max-width: 600px) {
+  section { padding: 16px; }
+  table thead { display: none; }
+  caption { display: block; width: 100%; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
+  td { border: none; padding: 2px 0; }
+  td::before { content: attr(data-label); display: block; color: var(--mut); font-size: .8rem; font-weight: 600; }
+  td:empty { display: none; }
+  nav ul { columns: 1; }
+  .linha { grid-template-columns: 1fr; gap: 4px; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>Pestinha: como a rede funciona, antes e depois</h1>
+  <p class="lead">Página de conferência do PR #1 do repositório <code>Cantyll/cantyll-brain</code>. O <strong>antes</strong> é o código do Pestinha 0.8.0 importado sem alterações (commit <code>91e0c59</code>). O <strong>depois</strong> é o estado da branch do PR (commit <code>c5d4c02</code>). Cada item diz se está no código, se está só preparado e se ainda não existe.</p>
+  <div class="legenda" aria-label="Legenda dos estados">
+    <span class="chip c-ok">Feito e ligado</span>
+    <span class="chip c-pronto">Pronto, mas não ligado</span>
+    <span class="chip c-desvio">Desvio da spec, confirmado</span>
+    <span class="chip c-confirmar">A confirmar</span>
+    <span class="chip c-pend">Pendente (na spec, não existe)</span>
+  </div>
+</header>
+
+<section aria-labelledby="sumario">
+  <h2 id="sumario">Sumário</h2>
+  <nav aria-label="Seções">
+    <ul>
+      <li><a href="#resumo">1. Em resumo</a></li>
+      <li><a href="#pensar">2. Como pensar na rede</a></li>
+      <li><a href="#rede">3. A rede: antes e depois</a></li>
+      <li><a href="#ausente">4. Com você ausente</a></li>
+      <li><a href="#sono">5. Sono e relógio</a></li>
+      <li><a href="#aprender">6. Aprendizado, semente e licença</a></li>
+      <li><a href="#custo">7. Custo do passo</a></li>
+      <li><a href="#desvios">8. Desvios e pontos a confirmar</a></li>
+      <li><a href="#pendente">9. Pendente na spec</a></li>
+      <li><a href="#glossario">10. Glossário</a></li>
+      <li><a href="#fontes">11. Fontes e como conferir</a></li>
+    </ul>
+  </nav>
+</section>
+
+<section id="resumo" aria-labelledby="t-resumo">
+  <h2 id="t-resumo">1. Em resumo</h2>
+  <ul>
+    <li><span class="chip c-ok">Feito e ligado</span> Sem você, o pet não fica mais triste. A carência agora leva a cansaço e quietude (regra R1 da spec).</li>
+    <li><span class="chip c-ok">Feito e ligado</span> Sem você, a rede segura a fuga e a travessura, e o app não apronta travessura.</li>
+    <li><span class="chip c-ok">Feito e ligado</span> O sono agora segue a pressão de sono e o relógio. Na simulação, dorme por volta de 21h14 e acorda por volta de 7h07.</li>
+    <li><span class="chip c-desvio">Desvio confirmado</span> A constante de sono é 0,12 por hora, e não 0,35 como na spec. O pico de vigília é 16h, e não o exemplo de 23h.</li>
+    <li><span class="chip c-pronto">Pronto, mas não ligado</span> O aprendizado por erro de predição existe, mas o app ainda manda previsão zero. Continua valendo a recompensa bruta, como antes.</li>
+    <li><span class="chip c-pronto">Pronto, mas não ligado</span> A semente do ruído é opcional. O app não a passa, então o ruído continua aleatório.</li>
+    <li><span class="chip c-ok">Medido</span> Custo: a rede atual gasta cerca de 5,5% de um núcleo. O número para 630 neurônios é estimativa com operações sintéticas, não a rede rodando.</li>
+    <li><span class="chip c-pend">Pendente</span> A maior parte da spec não existe no código: Izhikevich, gânglios da base, porta talâmica, replay noturno, moduladores A, ACh e S, sinapses que nascem e morrem.</li>
+    <li><span class="chip c-confirmar">A confirmar</span> A regra R1 foi aplicada à carência em geral, e não só à ausência. Com você presente e sem interagir, a carência também deixou de virar tristeza. Veja a seção 8.</li>
+  </ul>
+  <p class="nota">Esta página não é uma simulação ao vivo. Ela mostra as conexões e constantes do código e os números medidos no PR, com as animações só para visualizar.</p>
+</section>
+
+<section id="pensar" aria-labelledby="t-pensar">
+  <h2 id="t-pensar">2. Como pensar na rede</h2>
+  <p>A rede é uma equipe de funcionários. Cada um tem um cargo: um cuida de tristeza, outro de cansaço, outro de fugir. Quando um funcionário recebe um recado forte, ele "grita" para os colegas ligados a ele.</p>
+  <div class="grid">
+    <div class="card">
+      <h3>Neurônio: balde com furo</h3>
+      <p>Cada neurônio é um balde com furo. O estímulo enche, o tempo esvazia, e quando o balde transborda ele dispara. O modelo do código é esse, chamado LIF.</p>
+    </div>
+    <div class="card">
+      <h3>Peso: volume do fio</h3>
+      <p>Cada ligação entre dois neurônios tem um peso. Peso alto é um grito que chega forte. Peso zero é um grito que não chega.</p>
+    </div>
+    <div class="card">
+      <h3>Inibição: o "shh"</h3>
+      <p>Um peso negativo é um colega mandando calar. Por isso "triste não senta" e "triste não apronta" estão no código como conexões negativas.</p>
+    </div>
+  </div>
+  <div class="analogia">Isto é uma simplificação. A spec prevê trocar o balde com furo por um neurônio mais rico (Izhikevich). Essa troca ainda não foi feita.</div>
+</section>
+
+<section id="rede" aria-labelledby="t-rede-h">
+  <h2 id="t-rede-h">3. A rede: antes e depois</h2>
+  <p>Diagrama simplificado com as conexões que mudaram e as que ligam os sentimentos às ações. A espessura da linha é o peso da conexão no código. Alterne entre antes e depois.</p>
+
+  <input type="radio" id="v-antes" name="versao" class="sr" checked aria-label="Mostrar antes">
+  <input type="radio" id="v-depois" name="versao" class="sr" aria-label="Mostrar depois">
+  <div class="seletor" role="group" aria-label="Escolha a versão do diagrama">
+    <label for="v-antes">Antes (0.8.0)</label>
+    <label for="v-depois">Depois (PR #1)</label>
+  </div>
+
+  <figure class="diagrama">
+    <svg viewBox="0 0 600 400" role="img" aria-labelledby="rede-t rede-d">
+      <title id="rede-t">Diagrama simplificado da rede, antes e depois</title>
+      <desc id="rede-d">Antes, a carência sem você alimentava a tristeza, e o cansaço alimentava tristeza e cantinho. Depois, a carência alimenta o cansaço, que leva ao repouso. Sem você, o modo visita inibe fugir e travessura.</desc>
+      <defs>
+        <marker id="seta-azul" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9ccbff"/></marker>
+        <marker id="seta-verm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffa3a3"/></marker>
+        <marker id="seta-verde" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7fe3b2"/></marker>
+        <marker id="barra-roxo" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M5,0 L5,10" stroke="#d2c2ff" stroke-width="3"/></marker>
+      </defs>
+
+      <!-- arestas comuns aos dois -->
+      <g class="comum">
+        <path class="aresta azul fluxo" stroke-width="1.6" d="M190,146 L230,140" marker-end="url(#seta-azul)"/>
+        <path class="aresta azul fluxo" stroke-width="3.4" d="M370,128 C390,100 395,60 410,45" marker-end="url(#seta-azul)"/>
+        <path class="aresta azul fluxo" stroke-width="2.2" d="M190,245 C210,250 215,262 230,264" marker-end="url(#seta-azul)"/>
+        <path class="aresta azul fluxo" stroke-width="4.6" d="M370,256 C390,220 395,160 410,136" marker-end="url(#seta-azul)"/>
+        <path class="aresta azul fluxo" stroke-width="5" d="M370,268 C390,262 395,240 410,229" marker-end="url(#seta-azul)"/>
+      </g>
+
+      <!-- só no antes -->
+      <g class="so-antes">
+        <path class="aresta verm fluxo" stroke-width="1.6" d="M190,48 C215,110 210,220 230,264" marker-end="url(#seta-verm)"/>
+        <path class="aresta verm fluxo" stroke-width="1.2" d="M300,168 L300,236" marker-end="url(#seta-verm)"/>
+        <path class="aresta verm fluxo" stroke-width="1.4" d="M370,150 C390,190 395,215 410,229" marker-end="url(#seta-verm)"/>
+      </g>
+
+      <!-- só no depois -->
+      <g class="so-depois">
+        <path class="aresta verde fluxo" stroke-width="1.6" d="M190,48 C215,70 210,120 230,140" marker-end="url(#seta-verde)"/>
+        <path class="aresta roxo" stroke-width="2.4" d="M190,346 C260,340 330,320 410,308" marker-end="url(#barra-roxo)"/>
+        <path class="aresta roxo" stroke-width="2.4" d="M190,350 C260,360 330,372 410,364" marker-end="url(#barra-roxo)"/>
+      </g>
+
+      <!-- nós -->
+      <g class="no">
+        <rect x="10" y="20" width="180" height="56" rx="10"/>
+        <text x="100" y="45" >Sem você</text>
+        <text class="sub" x="100" y="65">(carência)</text>
+      </g>
+      <g class="no">
+        <rect x="10" y="118" width="180" height="56" rx="10"/>
+        <text x="100" y="143">Energia baixa</text>
+        <text class="sub" x="100" y="163">(cansaço)</text>
+      </g>
+      <g class="no">
+        <rect x="10" y="214" width="180" height="62" rx="10"/>
+        <text x="100" y="239">Dispensa,</text>
+        <text class="sub" x="100" y="261">bolinha, pancada</text>
+      </g>
+      <g class="no so-depois ausencia">
+        <rect x="10" y="318" width="180" height="56" rx="10"/>
+        <text x="100" y="343">Você ausente</text>
+        <text class="sub" x="100" y="363">(modo visita)</text>
+      </g>
+      <g class="no">
+        <rect x="230" y="112" width="140" height="56" rx="10"/>
+        <text x="300" y="146">Cansaço</text>
+      </g>
+      <g class="no">
+        <rect x="230" y="236" width="140" height="56" rx="10"/>
+        <text x="300" y="270">Tristeza</text>
+      </g>
+      <g class="no">
+        <rect x="410" y="20" width="180" height="50" rx="10"/>
+        <text x="500" y="51">Repouso</text>
+      </g>
+      <g class="no">
+        <rect x="410" y="108" width="180" height="56" rx="10"/>
+        <text x="500" y="133">Tristeza ativa</text>
+        <text class="sub" x="500" y="153">(protesto)</text>
+      </g>
+      <g class="no">
+        <rect x="410" y="204" width="180" height="50" rx="10"/>
+        <text x="500" y="234">Cantinho triste</text>
+      </g>
+      <g class="no">
+        <rect x="410" y="286" width="180" height="44" rx="10"/>
+        <text x="500" y="314">Tentar fugir</text>
+      </g>
+      <g class="no">
+        <rect x="410" y="342" width="180" height="44" rx="10"/>
+        <text x="500" y="370">Travessura</text>
+      </g>
+    </svg>
+    <figcaption class="nota">Setas: influência positiva. Barra roxa: inibição. Espessura: peso da conexão no código.</figcaption>
+  </figure>
+
+  <ul class="legenda-rede" aria-label="Legenda do diagrama">
+    <li><span class="swatch azul"></span>Conexão igual nos dois casos</li>
+    <li><span class="swatch verm"></span>Só existe no antes (foi removida ou zerada)</li>
+    <li><span class="swatch verde"></span>Só existe no depois</li>
+    <li><span class="swatch roxo"></span>Inibição do modo visita (só no depois)</li>
+  </ul>
+
+  <p class="so-antes-texto"><strong>Antes:</strong> a carência sem você ligava direto à tristeza (peso 0,08). Cansaço também puxava tristeza (0,03) e cantinho (0,05). Nada na rede segurava a fuga nem a travessura quando você estava fora.</p>
+  <p class="so-depois-texto"><strong>Depois:</strong> a carência liga ao cansaço (0,08), e o cansaço leva ao repouso (0,30, igual ao antes). Os caminhos de cansaço para tristeza e para cantinho foram zerados. Sem você, a inibição do modo visita (corrente de 0,2 por ms) segura fuga e travessura.</p>
+
+  <div class="tabela-wrap">
+    <table>
+      <caption class="nota" style="text-align:left;padding:6px 0">Conexões que mudaram ou importam para a leitura (pesos de <code>CONNECTIONS</code>, <code>pestinha/core/nervous_system.py</code>)</caption>
+      <thead>
+        <tr><th scope="col">Conexão</th><th scope="col">Antes</th><th scope="col">Depois</th><th scope="col">Motivo</th></tr>
+      </thead>
+      <tbody>
+        <tr><td data-label="Conexão">Carência (sem você) → Tristeza</td><td data-label="Antes" class="num">0,08</td><td data-label="Depois" class="num">removida</td><td data-label="Motivo">R1: carência não vira tristeza</td></tr>
+        <tr><td data-label="Conexão">Carência → Cansaço</td><td data-label="Antes" class="num">não existia</td><td data-label="Depois" class="num">0,08</td><td data-label="Motivo">R1: ausência cansa de esperar</td></tr>
+        <tr><td data-label="Conexão">Cansaço → Tristeza</td><td data-label="Antes" class="num">0,03</td><td data-label="Depois" class="num">0</td><td data-label="Motivo">R1: cansaço não é tristeza</td></tr>
+        <tr><td data-label="Conexão">Cansaço → Cantinho triste</td><td data-label="Antes" class="num">0,05</td><td data-label="Depois" class="num">0</td><td data-label="Motivo">R1</td></tr>
+        <tr><td data-label="Conexão">Cansaço → Repouso</td><td data-label="Antes" class="num">0,30</td><td data-label="Depois" class="num">0,30</td><td data-label="Motivo">Igual</td></tr>
+        <tr><td data-label="Conexão">Tristeza → Tristeza ativa (protesto)</td><td data-label="Antes" class="num">0,45</td><td data-label="Depois" class="num">0,45</td><td data-label="Motivo">Igual</td></tr>
+        <tr><td data-label="Conexão">Tristeza → Cantinho triste</td><td data-label="Antes" class="num">0,50</td><td data-label="Depois" class="num">0,50</td><td data-label="Motivo">Igual. A tristeza vem de dispensa, bolinha levada, pancada, pedido recusado e receio do cantinho</td></tr>
+        <tr><td data-label="Conexão">Protesto de tristeza (fora da rede)</td><td data-label="Antes">soma 0,5 × carência</td><td data-label="Depois">só a tristeza da rede</td><td data-label="Motivo">R1, <code>pestinha/mind/protest_ctl.py</code> linha 46</td></tr>
+        <tr><td data-label="Conexão">Ausência → Fugir e travessura</td><td data-label="Antes">nada</td><td data-label="Depois">corrente de −0,2 por ms</td><td data-label="Motivo">Modulador, <code>definir_ausencia</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="ausente" aria-labelledby="t-ausente">
+  <h2 id="t-ausente">4. Com você ausente</h2>
+  <p>"Ausente" é o estado em que não há teclado nem mouse há um tempo (<code>away_after</code>: 60 s no perfil normal, 10 s no de teste). O app liga o modo visita quando isso acontece (<code>pestinha/app.py</code> linha 410).</p>
+
+  <h3>Taxas medidas no PR, com você ausente (Hz por neurônio)</h3>
+  <p class="nota">Valores das duas janelas de 6 s, medidos no PR. A barra mostra a média das duas janelas. A escala vai até 16 Hz.</p>
+
+  <div role="group" aria-label="Taxas com você ausente, antes e depois">
+    <div class="linha">
+      <span class="rotulo">Tristeza ativa (SAD)</span>
+      <div class="trilha" style="--w:33%" aria-hidden="true"><span class="barra antes" style="--w:33%"></span></div>
+    </div>
+    <p class="nota" style="margin:-6px 0 12px 0">Antes: 5,7 e 4,9 Hz. Depois: 0 e 0 Hz.</p>
+
+    <div class="linha">
+      <span class="rotulo">Cantinho triste (CANTO)</span>
+      <div class="trilha" aria-hidden="true"><span class="barra antes" style="--w:43%"></span></div>
+    </div>
+    <p class="nota" style="margin:-6px 0 12px 0">Antes: 7,4 e 6,2 Hz. Depois: 0 e 0 Hz.</p>
+
+    <div class="linha">
+      <span class="rotulo">Repouso (DROWSE)</span>
+      <div class="trilha" aria-hidden="true"><span class="barra antes" style="--w:16%"></span></div>
+    </div>
+    <p class="nota" style="margin:-6px 0 6px 0">Antes: 3,0 e 2,1 Hz.</p>
+    <div class="linha">
+      <span class="rotulo">&nbsp;</span>
+      <div class="trilha" aria-hidden="true"><span class="barra depois" style="--w:48%"></span></div>
+    </div>
+    <p class="nota" style="margin:-6px 0 12px 0">Depois: 8,2 e 7,3 Hz.</p>
+
+    <div class="linha">
+      <span class="rotulo">Fugir (FUGIR)</span>
+      <div class="trilha" aria-hidden="true"><span class="barra antes" style="--w:25%"></span></div>
+    </div>
+    <p class="nota" style="margin:-6px 0 12px 0">Antes: 4,2 e 3,9 Hz. Depois: 0 e 0 Hz.</p>
+
+    <div class="linha">
+      <span class="rotulo">Travessura (TRAVESSURA)</span>
+      <div class="trilha" aria-hidden="true"><span class="barra antes" style="--w:88%"></span></div>
+    </div>
+    <p class="nota" style="margin:-6px 0 6px 0">Antes: 13,4 e 14,8 Hz.</p>
+    <div class="linha">
+      <span class="rotulo">&nbsp;</span>
+      <div class="trilha" aria-hidden="true"><span class="barra depois" style="--w:7%"></span></div>
+    </div>
+    <p class="nota" style="margin:-6px 0 12px 0">Depois: 0,8 e 1,6 Hz. O app zera a travessura de vez quando você está ausente, então a rede não chega a ela.</p>
+  </div>
+
+  <div class="alerta">
+    <strong>Reprodução nesta revisão.</strong> Rodei a rede com carência, tédio e silêncio no máximo, 15 s simulados, semente 7, e a média dos últimos 6 s. Antes: tristeza 5,8, cantinho 7,7, repouso 3,4, fugir 4,3, travessura 13,7 Hz. Depois, ausente: tristeza 0, cantinho 0, repouso 8,4, fugir 0, travessura 0,6 Hz. Os valores ficam na mesma faixa do PR. É um estímulo simplificado, não o loop do app.
+  </div>
+
+  <h3>Guardas no app</h3>
+  <ul>
+    <li><span class="chip c-ok">Feito e ligado</span> Ausente não apronta travessura (<code>app.py</code> linha 564).</li>
+    <li><span class="chip c-ok">Feito e ligado</span> No cantinho, ausente não junta vontade de fugir (<code>castigo_ctl.py</code>, parâmetro <code>ausente</code>; <code>app.py</code> linha 507).</li>
+    <li><span class="chip c-ok">Feito e ligado</span> Modo visita da rede (<code>definir_ausencia</code>, corrente <code>AUSENCIA_CORRENTE = 0,2</code>).</li>
+    <li><span class="chip c-pend">Não medido</span> Três dias sem usuário. A spec pede esse teste. O PR mediu só janelas curtas.</li>
+  </ul>
+
+  <div class="alerta">
+    <span class="chip c-confirmar">A confirmar</span> <strong>O efeito vai além da ausência.</strong> A carência sobe também com você presente (<code>pestinha/core/homeostasis.py</code>, linha 79: a taxa é 1,0 com você presente e 0,3 ausente). Como a tristeza por carência saiu da rede, um pet que você ignora por horas, com você ali, também não fica triste. A spec R1 fala só de ausência. Essa extensão não aparece na lista de decisões confirmadas.
+  </div>
+  <div class="alerta">
+    <span class="chip c-confirmar">A confirmar</span> <strong>Travessura com você presente.</strong> Na mesma reprodução, com você presente, a travessura foi de 13,7 para 15,7 Hz. O mecanismo aponta para cima: carência e cansaço deixaram de alimentar a tristeza, e a tristeza inibe a travessura (peso −0,50). Uma rodada só. O PR fala em variação de até ±20% entre janelas, então pode ser ruído. Vale medir com mais semente.
+  </div>
+</section>
+
+<section id="sono" aria-labelledby="t-sono">
+  <h2 id="t-sono">5. Sono e relógio</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Antes: sono pela energia</h3>
+      <p>Dorme quando a energia cai abaixo de 0,18. Acorda quando sobe acima de 0,6. A hora do dia não entra.</p>
+    </div>
+    <div class="card">
+      <h3>Depois: pressão e relógio</h3>
+      <p><strong>P</strong> (pressão de sono) sobe devagar acordado e cai dormindo, como um copo que enche de dia e esvazia de noite. <strong>C</strong> é o relógio: vale 1 às 16h e −1 às 4h da manhã.</p>
+    </div>
+  </div>
+  <ul style="margin-top:12px">
+    <li><span class="chip c-ok">Feito e ligado</span> Dorme se P passa de 0,75 e C está abaixo de 0,2 (noite). Também dorme se P passa de 0,95.</li>
+    <li><span class="chip c-ok">Feito e ligado</span> Acorda se P cai abaixo de 0,25. Também acorda no pico de vigília (C acima de 0,6) com P abaixo de 0,5.</li>
+    <li><span class="chip c-ok">Feito e ligado</span> Carinho acorda na hora, de qualquer jeito.</li>
+    <li><span class="chip c-pend">Pendente</span> O relógio não modula a rede acordada. Hoje ele só decide o sono. A spec chama isso de "ritmo diário" (seção 10).</li>
+  </ul>
+
+  <figure class="diagrama" style="margin-top:16px">
+    <svg viewBox="0 0 600 230" role="img" aria-labelledby="dia-t dia-d" style="max-width:640px">
+      <title id="dia-t">Pressão de sono ao longo de um dia simulado</title>
+      <desc id="dia-d">A pressão de sono cai de 0,59 à meia-noite até 0,25 às 7h07, quando o pet acorda. Sobe até 0,82 às 21h14, quando dorme. Cai de novo durante a noite.</desc>
+      <!-- faixas: dormindo / acordado / dormindo -->
+      <rect x="20" y="20" width="166" height="180" fill="#241f3d"/>
+      <rect x="186" y="20" width="329" height="180" fill="#17303a"/>
+      <rect x="515" y="20" width="65" height="180" fill="#241f3d"/>
+      <text x="103" y="186" fill="#e8edf3" font-size="15" font-weight="700" text-anchor="middle">dormindo</text>
+      <text x="350" y="46" fill="#e8edf3" font-size="15" font-weight="700" text-anchor="middle">acordado</text>
+      <text x="547" y="112" fill="#e8edf3" font-size="15" font-weight="700" text-anchor="middle">dormindo</text>
+      <!-- limiares -->
+      <line x1="20" y1="65" x2="580" y2="65" stroke="#8fa0b5" stroke-dasharray="5 5" stroke-width="1.2"/>
+      <line x1="20" y1="155" x2="580" y2="155" stroke="#8fa0b5" stroke-dasharray="5 5" stroke-width="1.2"/>
+      <text x="26" y="60" fill="#b8c3d1" font-size="13">P 0,75: dorme à noite</text>
+      <text x="380" y="150" fill="#b8c3d1" font-size="13">P 0,25: acorda</text>
+      <!-- eixo do tempo -->
+      <line x1="20" y1="200" x2="580" y2="200" stroke="#2c3848" stroke-width="1.5"/>
+      <g fill="#b8c3d1" font-size="13" text-anchor="middle">
+        <text x="20" y="218">0h</text>
+        <text x="160" y="218">6h</text>
+        <text x="300" y="218">12h</text>
+        <text x="440" y="218">18h</text>
+        <text x="580" y="218">24h</text>
+      </g>
+      <!-- curva de P (0 h a 24 h, de 15 em 15 min) -->
+      <polyline class="dia-p" fill="none" stroke="#ffd27a" stroke-width="3" stroke-linejoin="round" pathLength="1000" points="20.0,94.5 25.8,97.6 31.7,100.6 37.5,103.5 43.3,106.4 49.2,109.2 55.0,111.8 60.8,114.5 66.7,117.0 72.5,119.4 78.3,121.8 84.2,124.1 90.0,126.4 95.8,128.5 101.7,130.7 107.5,132.7 113.3,134.7 119.2,136.6 125.0,138.5 130.8,140.3 136.7,142.1 142.5,143.8 148.3,145.5 154.2,147.1 160.0,148.6 165.8,150.1 171.7,151.6 177.5,153.1 183.3,154.4 189.2,153.2 195.0,149.9 200.8,146.7 206.7,143.6 212.5,140.5 218.3,137.6 224.2,134.7 230.0,131.8 235.8,129.1 241.7,126.4 247.5,123.7 253.3,121.2 259.2,118.7 265.0,116.2 270.8,113.9 276.7,111.6 282.5,109.3 288.3,107.1 294.2,104.9 300.0,102.8 305.8,100.8 311.7,98.8 317.5,96.9 323.3,95.0 329.2,93.1 335.0,91.3 340.8,89.5 346.7,87.8 352.5,86.2 358.3,84.5 364.2,82.9 370.0,81.4 375.8,79.9 381.7,78.4 387.5,76.9 393.3,75.5 399.2,74.2 405.0,72.8 410.8,71.5 416.7,70.2 422.5,69.0 428.3,67.8 434.2,66.6 440.0,65.5 445.8,64.3 451.7,63.2 457.5,62.2 463.3,61.1 469.2,60.1 475.0,59.1 480.8,58.2 486.7,57.2 492.5,56.3 498.3,55.4 504.2,54.5 510.0,53.7 515.8,53.2 521.7,57.5 527.5,61.7 533.3,65.8 539.2,69.8 545.0,73.6 550.8,77.4 556.7,81.0 562.5,84.5 568.3,87.9 574.2,91.2 580.0,94.5"/>
+      <!-- marcador de agora: 24 s = 1 dia -->
+      <g class="agora-linha">
+        <line x1="20" y1="20" x2="20" y2="200" stroke="#e8edf3" stroke-width="2"/>
+      </g>
+      <g fill="#e8edf3" font-size="13" font-weight="600">
+        <text x="520" y="14" text-anchor="start">dorme 21h14</text>
+        <text x="190" y="14" text-anchor="start">acorda 7h07</text>
+      </g>
+    </svg>
+    <figcaption class="nota">Simulação de um dia com as constantes do código: P começa em 0,25 às 7h07 e o pico de vigília é 16h. A linha amarela se desenha ao abrir a página, e a linha branca dá a volta em 24 s, só para visualizar. Não inclui as condições de chão, de protesto e de missão, que também valem para dormir.</figcaption>
+  </figure>
+
+  <div class="alerta">
+    <span class="chip c-desvio">Desvio confirmado</span> <strong>Constante de sono: 0,12 por hora (spec: 0,35).</strong> Com 0,35, o sono dura cerca de 3,3 a 3,4 horas, porque P ao dormir é de 0,80 a 0,82. Com 0,12, dura cerca de 9,9 horas. O PR diz 3,7 horas para o caso de 0,35. A conta dá um pouco menos, mas a conclusão não muda: 0,35 dorme pouco.
+  </div>
+  <div class="alerta">
+    <span class="chip c-desvio">Desvio confirmado</span> <strong>Pico de vigília: 16h (spec: exemplo de 23h).</strong> Com 23h, a janela de relógio que deixa dormir fica entre cerca de 4h18 e 17h42. Ou seja, o pet dormiria de dia.
+  </div>
+</section>
+
+<section id="aprender" aria-labelledby="t-aprender">
+  <h2 id="t-aprender">6. Aprendizado, semente e licença</h2>
+  <div class="grid">
+    <div class="card">
+      <h3><span class="chip c-pronto">Pronto, mas não ligado</span></h3>
+      <p><strong>Antes:</strong> o peso muda pela recompensa bruta. Um carinho ensina igual se você esperava o carinho ou não.</p>
+      <p><strong>Depois:</strong> <code>learn(reward, expected, dt)</code> calcula o erro de predição: recompensa menos previsão. Mas o app chama com <code>expected = 0</code> (<code>app.py</code> linha 443). O resultado é o mesmo de antes.</p>
+      <p class="nota">A previsão vinda do condicionamento (decisão D3) entra no M2, que ainda não existe.</p>
+    </div>
+    <div class="card">
+      <h3><span class="chip c-pronto">Pronto, mas não ligado</span></h3>
+      <p><strong>Antes:</strong> o ruído usa <code>default_rng()</code>, então cada execução é diferente.</p>
+      <p><strong>Depois:</strong> <code>LIFBrain(seed_ruido=...)</code> aceita uma semente. O padrão continua aleatório. A chamada do app (<code>criar_cerebro</code>) não passa semente.</p>
+      <p class="nota">Teste de determinismo em <code>tests/test_nucleo_m0.py</code>.</p>
+    </div>
+    <div class="card">
+      <h3><span class="chip c-ok">Feito e ligado</span></h3>
+      <p><strong>Estado e versão:</strong> <code>estado()</code>, versão no save, tipo <code>"lif"</code> gravado, e <code>criar_cerebro</code> escolhe o cérebro pelo nome. Saves antigos carregam sem mudança. Só existe o cérebro LIF.</p>
+      <p><strong>Pressão de sono</strong> é gravada em <code>drives.json</code>. Arquivo antigo carrega com 0,3.</p>
+    </div>
+    <div class="card">
+      <h3><span class="chip c-desvio">Confirmado</span> Licença</h3>
+      <p><strong>Antes:</strong> o <code>LICENSE</code> do repositório principal era BSD-3-Clause, mas o <code>pyproject.toml</code> do 0.8.0 já dizia GPL-3.0-or-later. As duas coisas não batiam.</p>
+      <p><strong>Depois:</strong> GPL-3.0-or-later, com <code>NOTICE</code>. A origem do código importado não foi conferida: o <code>NOTICE</code> diz que os autores originais não aparecem nos arquivos.</p>
+    </div>
+  </div>
+</section>
+
+<section id="custo" aria-labelledby="t-custo">
+  <h2 id="t-custo">7. Custo do passo</h2>
+  <p>Fração de um núcleo de CPU que a rede gasta por segundo simulado. A escala vai de 0 a 30%. A linha roxa marca 25%, que é o limite inicial da spec.</p>
+
+  <div role="group" aria-label="Custo do passo, em fração de um núcleo">
+    <div class="linha">
+      <span class="rotulo">Rede atual: 470 neurônios, passo de 1 ms (medido)</span>
+      <div class="trilha" style="--w:18%" aria-hidden="true">
+        <span class="barra custo" style="--w:18%"></span>
+        <span class="marca" style="left:83.33%"></span>
+      </div>
+    </div>
+    <p class="nota" style="margin:-6px 0 12px 0">Cerca de 5,5% (51 a 57 µs por passo). Medido com a rede real.</p>
+
+    <div class="linha">
+      <span class="rotulo">630 neurônios, passo de 0,5 ms (estimativa)</span>
+      <div class="trilha" aria-hidden="true">
+        <span class="barra" style="--w:13.33%;left:76.67%;background:var(--ambar)"></span>
+        <span class="marca" style="left:83.33%"></span>
+      </div>
+    </div>
+    <p class="nota" style="margin:-6px 0 6px 0">Entre 23% e 27%, com mediana perto de 24%. Medido com operações sintéticas do mesmo tamanho, não com a rede de 630 neurônios.</p>
+  </div>
+
+
+  <ul style="margin-top:14px">
+    <li><span class="chip c-pend">Não definida</span> A máquina de referência da spec ainda não foi definida. A medida é de um Xeon de nuvem com 2,1 GHz e Python 3.13.</li>
+    <li><span class="chip c-pend">Não medido</span> Izhikevich (M1) muda o custo por neurônio. Esse número ainda não existe, e é o maior risco para o orçamento de 25%.</li>
+    <li><span class="chip c-ajuste">Ajustar o texto do PR</span> O texto do PR põe os 23% a 27% de 630 neurônios ao lado das medidas, sem dizer que é estimativa sintética. O <code>docs/CUSTO_DO_PASSO.md</code> diz isso.</li>
+  </ul>
+</section>
+
+<section id="desvios" aria-labelledby="t-desvios">
+  <h2 id="t-desvios">8. Desvios e pontos a confirmar</h2>
+  <p>Decisões confirmadas pelo autor do projeto, e pontos que o PR não confirmou.</p>
+  <div class="tabela-wrap">
+    <table>
+      <thead><tr><th scope="col">Ponto</th><th scope="col">Estado</th><th scope="col">Evidência ou detalhe</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Ponto">Constante de sono 0,12 por hora (spec 0,35)</td><td data-label="Estado"><span class="chip c-desvio">Confirmado</span></td><td data-label="Evidência ou detalhe">Seção 5.</td></tr>
+        <tr><td data-label="Ponto">Pico de vigília 16h (spec: exemplo de 23h)</td><td data-label="Estado"><span class="chip c-desvio">Confirmado</span></td><td data-label="Evidência ou detalhe">Seção 5. <code>pets/bryan.json</code> e <code>pets/jorge.json</code> usam 16.</td></tr>
+        <tr><td data-label="Ponto">Tristeza por dispensa de travessura e por bolinha levada continua</td><td data-label="Estado"><span class="chip c-ok">Decisão mantida</span></td><td data-label="Evidência ou detalhe">Não é ausência, então não entra em R1.</td></tr>
+        <tr><td data-label="Ponto">Ausência segura fuga e travessura na rede</td><td data-label="Estado"><span class="chip c-ok">Decisão confirmada</span></td><td data-label="Evidência ou detalhe">Seção 4.</td></tr>
+        <tr><td data-label="Ponto">GPL-3.0-or-later</td><td data-label="Estado"><span class="chip c-desvio">Confirmado</span></td><td data-label="Evidência ou detalhe">Autoria upstream não identificada (seção 6).</td></tr>
+        <tr><td data-label="Ponto"><strong>Carência presente também não vira tristeza</strong></td><td data-label="Estado"><span class="chip c-confirmar">A confirmar</span></td><td data-label="Evidência ou detalhe">Seção 4. R1 na spec fala só de ausência. Decida se a extensão é desejada.</td></tr>
+        <tr><td data-label="Ponto"><strong>Travessura sobe um pouco com você presente</strong></td><td data-label="Estado"><span class="chip c-confirmar">A confirmar</span></td><td data-label="Evidência ou detalhe">Seção 4. Uma rodada de reprodução (13,7 para 15,7 Hz). Pode ser ruído.</td></tr>
+        <tr><td data-label="Ponto">Custo de 630 neurônios ao lado das medidas, sem dizer que é estimativa</td><td data-label="Estado"><span class="chip c-ajuste">Ajustar o texto do PR</span></td><td data-label="Evidência ou detalhe">Seção 7. É estimativa sintética.</td></tr>
+        <tr><td data-label="Ponto">"3,7 horas" de sono com K = 0,35</td><td data-label="Estado"><span class="chip c-ajuste">Ajustar o texto do PR</span></td><td data-label="Evidência ou detalhe">A conta dá 3,3 a 3,4 horas. A conclusão se mantém.</td></tr>
+        <tr><td data-label="Ponto">"Ritmo diário passa só porque ele dorme às 23 h"</td><td data-label="Estado"><span class="chip c-ajuste">Ajustar o texto do PR</span></td><td data-label="Evidência ou detalhe">Texto antigo: o pico agora é 16h, e o pet dorme às 21h14.</td></tr>
+        <tr><td data-label="Ponto">Tabela "Antes (978e033)"</td><td data-label="Estado"><span class="chip c-ajuste">Ajustar o texto do PR</span></td><td data-label="Evidência ou detalhe">O commit 978e033 é o M0, e não o código original (91e0c59). O rótulo confunde.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="pendente" aria-labelledby="t-pendente">
+  <h2 id="t-pendente">9. Pendente na spec (ainda não existe)</h2>
+  <p>A spec (<code>docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md</code>, seção 13) tem as fases M0 a M7. O PR fez M0 e parte de M3 (sono e relógio). O resto não está no código. Os cartões abaixo usam a mesma ordem da spec.</p>
+  <div class="grid">
+    <div class="card pend">
+      <h3><span class="chip c-pend">Não feito</span> M1: neurônio Izhikevich e passo de 0,5 ms</h3>
+      <p>Troca o balde com furo por um neurônio com mais tipos de disparo. Obriga a recalibrar todos os limiares, e precisa da máquina de referência para medir o custo.</p>
+    </div>
+    <div class="card pend">
+      <h3><span class="chip c-pend">Não feito</span> M2: moduladores e aprendizado por erro</h3>
+      <p>Hormônios globais: arousal (A), acetilcolina (ACh) e serotonina (S). Também a regra de três fatores e a previsão do condicionamento (D3). Os testes de habituação, bloqueio, extinção e surpresa ainda não existem.</p>
+    </div>
+    <div class="card pend">
+      <h3><span class="chip c-pend">Parcial</span> M3: sono, relógio e replay</h3>
+      <p>Sono e relógio: feitos. Replay noturno, que reprocessa lembranças durante o sono: não feito.</p>
+    </div>
+    <div class="card pend">
+      <h3><span class="chip c-pend">Não feito</span> M4: gânglios da base</h3>
+      <p>Quem libera cada ação passa a ser um balanço entre dois caminhos (D1 e D2), no lugar dos limiares e sorteios atuais. Exige aprovação da decisão D5 antes de começar.</p>
+    </div>
+    <div class="card pend">
+      <h3><span class="chip c-pend">Não feito</span> M5: porta talâmica, susto e respiração</h3>
+      <p>Um filtro sensorial que fecha durante o sono, um reflexo rápido de susto e um ritmo de respiração que mexe na escala do corpo.</p>
+    </div>
+    <div class="card pend">
+      <h3><span class="chip c-pend">Não feito</span> M6: sinapses que nascem e morrem</h3>
+      <p>Conexões crescem e somem com o uso, com teste de retenção de 80%. Antes disso, <code>PRIVACIDADE.md</code> precisa ser atualizado.</p>
+    </div>
+    <div class="card pend">
+      <h3><span class="chip c-pend">Não feito, opcional</span> M7: neurogênese</h3>
+      <p>Neurônios novos, com teto de 800. Desligado por padrão (decisão D9).</p>
+    </div>
+    <div class="card pend">
+      <h3><span class="chip c-pend">Não feito</span> Outros itens</h3>
+      <ul>
+        <li>Relógio modulando a rede acordada.</li>
+        <li>Teste de três dias sem usuário.</li>
+        <li><code>step(dt_real)</code>: existe, mas o app não usa.</li>
+        <li>Máquina de referência do custo.</li>
+        <li>Downscaling no sono (decisão D4): a spec pede desligado, e nada dele foi implementado.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="glossario" aria-labelledby="t-glossario">
+  <h2 id="t-glossario">10. Glossário</h2>
+  <div class="tabela-wrap">
+    <table>
+      <thead><tr><th scope="col">Termo</th><th scope="col">Analogia</th><th scope="col">Onde está no código</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Termo">Neurônio LIF</td><td data-label="Analogia">Balde com furo: enche, esvazia e transborda</td><td data-label="Onde está no código"><code>LIFBrain</code>, <code>nervous_system.py</code></td></tr>
+        <tr><td data-label="Termo">Sinapse ou peso</td><td data-label="Analogia">Volume do fio entre dois colegas</td><td data-label="Onde está no código"><code>CONNECTIONS</code></td></tr>
+        <tr><td data-label="Termo">Inibição</td><td data-label="Analogia">Um colega mandando calar</td><td data-label="Onde está no código">Pesos negativos</td></tr>
+        <tr><td data-label="Termo">Carência (LONELY)</td><td data-label="Analogia">Barra de saudade que sobe sem contato</td><td data-label="Onde está no código"><code>homeostasis.py</code>, <code>Drives.update</code></td></tr>
+        <tr><td data-label="Termo">Cansaço (FATIGUE, TIRED)</td><td data-label="Analogia">Vontade de deitar quando a energia cai</td><td data-label="Onde está no código"><code>homeostasis.py</code>, <code>nervous_system.py</code></td></tr>
+        <tr><td data-label="Termo">Pressão de sono (P)</td><td data-label="Analogia">Copo que enche acordado e esvazia dormindo</td><td data-label="Onde está no código"><code>pestinha/core/ritmo.py</code></td></tr>
+        <tr><td data-label="Termo">Relógio (C)</td><td data-label="Analogia">Relógio de parede com pico de vigília às 16h</td><td data-label="Onde está no código"><code>pestinha/core/ritmo.py</code></td></tr>
+        <tr><td data-label="Termo">Erro de predição (δ)</td><td data-label="Analogia">Quanto foi melhor ou pior do que eu esperava</td><td data-label="Onde está no código"><code>learn()</code></td></tr>
+        <tr><td data-label="Termo">Recompensa bruta</td><td data-label="Analogia">Elogio sem contexto: ensina igual, esperado ou não</td><td data-label="Onde está no código"><code>app.py</code> linha 443</td></tr>
+        <tr><td data-label="Termo">Modo visita (R1)</td><td data-label="Analogia">Quieto na fuga e na travessura quando você não está</td><td data-label="Onde está no código"><code>definir_ausencia</code>, <code>AUSENCIA_CORRENTE</code></td></tr>
+        <tr><td data-label="Termo">R1: sem culpa</td><td data-label="Analogia">Ausência leva a repouso, nunca a tristeza ativa</td><td data-label="Onde está no código">Spec, seção 1</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="fontes" aria-labelledby="t-fontes">
+  <h2 id="t-fontes">11. Fontes e como conferir</h2>
+  <ul>
+    <li>Spec: <code>docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md</code> (seções 1, 5, 8, 10, 13 e 14).</li>
+    <li>Custo: <code>docs/CUSTO_DO_PASSO.md</code> e <code>ferramentas/medir_custo_passo.py</code>.</li>
+    <li>Código: <code>pestinha/core/nervous_system.py</code> (<code>CONNECTIONS</code>, <code>learn</code>, <code>definir_ausencia</code>), <code>pestinha/core/ritmo.py</code>, <code>pestinha/mind/sleep.py</code>, <code>pestinha/core/homeostasis.py</code>, <code>pestinha/mind/protest_ctl.py</code>, <code>pestinha/mind/castigo_ctl.py</code>, <code>pestinha/app.py</code>, <code>pestinha/config.py</code>, <code>pets/*.json</code>.</li>
+    <li>Testes: <code>tests/test_ritmo.py</code> e <code>tests/test_nucleo_m0.py</code>. Com PySide6 instalado, rode <code>python -m pytest</code>. Sem ele, <code>python -m pytest --noconftest tests/test_ritmo.py tests/test_nucleo_m0.py</code> roda os dois arquivos.</li>
+  </ul>
+  <p class="nota">Base desta página: commit <code>c5d4c02</code>, branch <code>claude/project-thread-otswt2</code> (PR #1). Antes: commit <code>91e0c59</code>. Os números de taxas e custo vêm do PR e de <code>docs/CUSTO_DO_PASSO.md</code>. Quando algo não está no código, a página diz isso em vez de desenhar.</p>
+</section>
+
+</main>
+</body>
+</html>
