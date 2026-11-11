@@ -36,6 +36,7 @@ from . import plataforma
 from .store import pasta_gravavel
 from .ajustes import (
     ATIVIDADE_MINIMA_VOO as REFLEX_MIN_HZ,
+    REPLAY_MS_POR_FRAME,
     BATIDA_FORTE as HARD_IMPACT,
     BATIDA_TONTA as DIZZY_IMPACT,
     DURACAO_TONTURA as DIZZY_SECONDS,
@@ -408,6 +409,9 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         self.pulso_recusa = 0.0
         total_ms = max(1, round(dt * 1000))
         self.brain.definir_ausencia(self.activity == "AWAY")   # R1: ausente, a rede segura fuga e travessura
+        # M3: o padrão sensorial deste instante vai para os episódios que começarem agora (replay da noite)
+        self.memory.sentidos_atuais = {k: round(v, 3) for k, v in intensities.items()
+                                       if v > 0 and k in self.brain.sensory_names}
         while total_ms > 0:
             chunk = min(100, total_ms)
             self.brain.stimulate(intensities)
@@ -441,6 +445,8 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         reward += self.castigo.punicao(now)          # ser preso é recompensa negativa: o castigo ensina
         # expected = 0: recompensa bruta, como antes. O V do condicionamento só entra no M2 (decisão D3).
         self.brain.learn(reward, 0.0, dt, self.prof["learn_rate"])
+        if self.asleep:                                  # M3: o replay da noite roda um pedaço por quadro
+            self.sleep.replay_passo(self.brain, REPLAY_MS_POR_FRAME, self.prof["learn_rate"])
 
         if self.in_flight:
             if body.grounded:

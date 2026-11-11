@@ -327,6 +327,9 @@ class Brain(ABC):
     def definir_ausencia(self, ausente):
         """Liga ou desliga o modulador de ausência (R1). Cérebro que não tem o modulador ignora."""
 
+    def replay(self, sentidos, ms, delta, rate=0.0):
+        """Replay noturno (M3): reativa o padrão sensorial por `ms` com δ = delta. Cérebro sem replay ignora."""
+
     @abstractmethod
     def motor_activity(self):
         """{motor: taxa de disparo suavizada, em Hz por neurônio}"""
@@ -582,6 +585,20 @@ class LIFBrain(Brain):
     def definir_ausencia(self, ausente):
         """R1: com o usuário ausente, FUGIR e TRAVESSURA recebem corrente inibitória (AUSENCIA_CORRENTE)."""
         self.ausente = bool(ausente)
+
+    def replay(self, sentidos, ms, delta, rate=LEARN_RATE_PADRAO):
+        """
+        Replay noturno (M3, spec seção 9.4): reativa o padrão sensorial de um episódio por `ms` milissegundos,
+        com δ = delta no aprendizado. Só os canais sensoriais contam; os que faltam valem 0.
+        """
+        entrada = {k: v for k, v in sentidos.items() if k in self.sensory_names}
+        restante = int(ms)
+        while restante > 0:
+            chunk = min(100, restante)
+            self.stimulate(entrada)
+            self.step(chunk)
+            self.learn(delta, 0.0, chunk / 1000.0, rate)
+            restante -= chunk
 
     def stimulate(self, intensities):
         """Recebe a intensidade (0 a 1) de cada canal sensorial e converte em probabilidade de disparo, com habituação."""

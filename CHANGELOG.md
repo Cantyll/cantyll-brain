@@ -10,6 +10,7 @@
 - `pets/*.json` aceita `pico_vigilia_h` (de 0 a 24). Bryan e Jorge usam 16.
 - Jorge perdeu o temperamento `LONELY->GLOOM`, porque essa ligação deixou de existir.
 - A rede tem 15808 sinapses (antes 15939, semente 7): saíram as ligações de cansaço para tristeza e para o cantinho.
+- Replay noturno (M3): ao dormir, até 50 episódios, os mais marcantes, voltam à rede por 0,5 s cada, com δ = 0,5 · δ. Cada episódio passa a guardar o nível dos sentidos naquele momento (`sentidos` em `episodes.jsonl`). Episódios antigos, sem esse dado, não entram no replay.
 
 ### Novidades internas
 - Licença GPL-3.0-or-later, com o arquivo `NOTICE`.

@@ -152,6 +152,14 @@ LIMIAR_ACORDA_PRESSAO_DIA = 0.5
 AUSENCIA_CORRENTE = 0.2         # corrente inibitória por ms em FUGIR e TRAVESSURA quando você está ausente (limiar de disparo: 1,0)
 
 # ---------------------------------------------------------------------------
+# Replay noturno (M3): reaplica os episódios durante o sono (spec, seção 9.4)
+# ---------------------------------------------------------------------------
+REPLAY_EPISODIOS = 50           # episódios reaplicados por sono, por |δ| e recência
+REPLAY_FATOR = 0.5              # δ_replay = REPLAY_FATOR · δ registrado (spec, seção 9.4)
+REPLAY_MS = 500                 # cada episódio reativa o padrão sensorial por 0,5 s
+REPLAY_MS_POR_FRAME = 100       # simulação de replay por quadro, para a tela não travar
+
+# ---------------------------------------------------------------------------
 # Validação
 # ---------------------------------------------------------------------------
 

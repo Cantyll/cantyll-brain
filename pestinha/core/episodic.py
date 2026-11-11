@@ -22,6 +22,7 @@ import random
 import time
 from datetime import datetime
 
+from .. import ajustes
 from ..store import append_line, read_json, read_lines, write_json, write_lines
 
 ACTIONS = ["meme", "foto", "bilhete", "atravessar", "nada"]
@@ -79,6 +80,14 @@ def _tabela_valida(bruta, por_contexto):
     return out
 
 
+def _sentidos_validos(sentidos):
+    """Níveis sensoriais guardados no episódio: dicionário de nome para número entre 0 e 1, e nada mais."""
+    if not isinstance(sentidos, dict) or not sentidos:
+        return False
+    return all(isinstance(k, str) and type(v) in (int, float) and math.isfinite(v) and 0.0 <= v <= 1.0
+               for k, v in sentidos.items())
+
+
 def dismiss_valence(elapsed, patience=30.0):
     """Fechou na hora: -0,8. Fechou depois de 30 s: -0,2."""
     return -0.8 + 0.6 * min(elapsed / patience, 1.0)
@@ -96,6 +105,7 @@ class EpisodicMemory:
         self.totals = {}            # ação -> [n, média] (todos os contextos)
         self.last_choice = None     # (contexto, ação, motivo) para o terminal
         self.ultima_acao = None     # episódio da última travessura, para o castigo ensinar
+        self.sentidos_atuais = {}   # níveis dos canais sensoriais neste instante (o app atualiza a cada quadro); entram no episódio
         self._contador = 0
 
     # ---------------- escolha ----------------
@@ -140,6 +150,7 @@ class EpisodicMemory:
             "inicio": time.monotonic(),
             "thing": thing,
             "carinho": False,
+            "sentidos": dict(self.sentidos_atuais),         # padrão sensorial da hora: o replay reativa isto
         }
         self.open.append(episode)
         self.ultima_acao = episode
@@ -236,6 +247,7 @@ class EpisodicMemory:
             "acao": ep["acao"],
             "resultado": result,
             "valencia": round(valence, 3),
+            "sentidos": ep.get("sentidos", {}),
         }
         self.recent.append(record)
         self.recent = self.recent[-KEEP_EPISODES:]
@@ -273,6 +285,25 @@ class EpisodicMemory:
         self._trim_file(episodes)
         self.save()
         return self.preferences()
+
+    def escolher_replay(self):
+        """
+        Replay noturno (spec, seção 9.4): até REPLAY_EPISODIOS episódios, por |δ| vezes recência.
+        Devolve [(sentidos, δ_replay)], com δ_replay = REPLAY_FATOR · δ. Episódios sem padrão
+        sensorial válido, ou com δ = 0, não entram.
+        """
+        episodes = self._read_episodes()
+        newest = len(episodes)
+        candidatos = []
+        for i, ep in enumerate(episodes):
+            sentidos, valencia = ep.get("sentidos"), ep["valencia"]
+            if valencia == 0 or not _sentidos_validos(sentidos):
+                continue
+            w = 0.5 ** ((newest - 1 - i) / RECENCY_HALF_LIFE)
+            candidatos.append((abs(valencia) * w, i, sentidos, valencia))
+        candidatos.sort(key=lambda c: (-c[0], -c[1]))            # maior prioridade primeiro; empate: o mais novo
+        return [(sentidos, ajustes.REPLAY_FATOR * valencia)
+                for _, _, sentidos, valencia in candidatos[:ajustes.REPLAY_EPISODIOS]]
 
     def preferences(self, top=6):
         """Contextos com preferência mais marcada: [(contexto, ação, média, n)]."""

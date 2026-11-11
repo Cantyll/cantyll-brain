@@ -7,7 +7,8 @@ A energia (homeostase) continua valendo como sentido interno, mas não manda no 
 
 Ele só adormece apoiado, sem ser segurado, sem voar, sem missão e fora de protesto ativo
 (indignado não dorme). Carinho acorda na hora, de qualquer jeito. Ao adormecer,
-consolida a memória episódica.
+consolida a memória episódica e monta a fila de replay (spec, seção 9.4): os episódios
+mais marcantes da memória voltam à rede, um pedaço por quadro, até ele acordar.
 """
 
 from ..log import log
@@ -27,6 +28,7 @@ class SleepController:
         self.pico_h = ajustes.PICO_VIGILIA_H if pico_h is None else pico_h
         self.relogio = relogio
         self.asleep = False
+        self.replay_fila = []       # episódios ainda não reaplicados nesta noite: {sentidos, delta, restante}
 
     def can_sleep(self, body, in_flight, protest_stage, mission):
         """Diz se ele pode dormir agora (no chão, sem ser segurado, sem voar, sem protesto forte e sem missão)."""
@@ -47,17 +49,33 @@ class SleepController:
             self.fall_asleep()
 
     def fall_asleep(self):
-        """Adormece e consolida: refaz as preferências a partir dos episódios."""
+        """Adormece, consolida e monta a fila de replay: refaz as preferências a partir dos episódios."""
         self.asleep = True
         prefs = self.memory.consolidate()
+        self.replay_fila = [{"sentidos": sentidos, "delta": delta, "restante": ajustes.REPLAY_MS}
+                            for sentidos, delta in self.memory.escolher_replay()]
         if self.debug():
-            log(f"[sono] dormiu ({self.drives.describe()})")
+            log(f"[sono] dormiu ({self.drives.describe()}), replay de {len(self.replay_fila)} episódios")
             for ctx, action, mean, n in prefs:
                 log(f"[sono]   {ctx} -> {action}: {mean:+.2f} ({n:.0f} episódios)")
 
+    def replay_passo(self, brain, orcamento_ms, rate):
+        """Usa até `orcamento_ms` de simulação no replay da noite, um episódio por vez, na ordem da fila. Devolve o tempo usado."""
+        usado = 0
+        while self.replay_fila and usado < orcamento_ms:
+            item = self.replay_fila[0]
+            n = min(orcamento_ms - usado, item["restante"])
+            brain.replay(item["sentidos"], n, item["delta"], rate)
+            item["restante"] -= n
+            usado += n
+            if item["restante"] <= 0:
+                self.replay_fila.pop(0)
+        return usado
+
     def wake(self, startled):
-        """Acorda: se foi um susto, ele fica assustado; senão, acorda calmo."""
+        """Acorda: se foi um susto, ele fica assustado; senão, acorda calmo. Replay que não acabou fica para a próxima noite."""
         self.asleep = False
+        self.replay_fila = []
         if startled:
             self.emotion.force("assustado", 1.2, priority=PRIORITY["assustado"])    # acordou no susto
         if self.debug():
