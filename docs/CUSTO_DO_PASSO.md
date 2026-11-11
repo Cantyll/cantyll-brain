@@ -1,12 +1,61 @@
 # Custo do passo da rede
 
 Quanto de um núcleo de CPU a rede gasta por segundo simulado. Os números vêm de
-`ferramentas/medir_custo_passo.py`, rodado nesta máquina. Eles não são uma previsão para a máquina
-de referência da spec (seção 10), que ainda não foi definida.
+`ferramentas/medir_custo_passo.py`, rodado em cada máquina. A máquina de referência é a de uso diário
+do Cantyll (seção abaixo). A primeira medida foi feita nela, num Windows 11.
 
 Reproduzir:
 
     python ferramentas/medir_custo_passo.py
+
+## Máquina de referência
+
+A referência é o computador em que o Pestinha roda no dia a dia de quem o usa. O pet vive no PC de
+quem o usa, então o critério é que ele caiba nesse PC, e não num servidor.
+
+Procedimento:
+
+1. Ligar o computador na tomada, com o modo de energia de desempenho ou equilibrado. Em bateria, o
+   processador costuma reduzir o clock, e a medida fica pior sem motivo.
+2. Rodar `python ferramentas/medir_custo_passo.py` três vezes, sem outros programas pesados abertos.
+3. Registrar a linha "Ambiente" e a tabela das três execuções, e comparar a mediana do passo de 630 neurônios.
+
+Critério: com 630 neurônios e passo de 0,5 ms, a fração de um núcleo fica em até 25% (spec, seção 10).
+Se passar, a saída é reduzir populações ou voltar para passo de 1 ms (D2).
+
+### Regra de escolha
+
+- A referência é a máquina de uso diário de quem usa o Pestinha, ligada na tomada, no modo de energia
+  de desempenho ou equilibrado.
+- A referência deste projeto é a máquina de uso diário do Cantyll. Ele a escolheu em 2026-11-11 por esse
+  motivo, e não pelo número que ela daria.
+- A medida na nuvem (Xeon compartilhado, 23% a 27% para 630 neurônios sintéticos) já existia quando a
+  referência foi escolhida. Ela não é a referência; fica registrada como medida.
+- A referência só muda com decisão registrada neste arquivo, com data e motivo. Se mudar, o LIF atual
+  (470 neurônios) é medido de novo na máquina nova antes de qualquer comparação.
+- Medidas em outras máquinas entram como medidas, não como referência.
+
+### Primeira medida: Windows 11, 8 núcleos lógicos
+
+Ambiente: Intel família 6 modelo 140, 8 núcleos lógicos, Python 3.15.2, numpy 2.5.4, Windows 11.
+
+| Execução | Real 470, 1 ms (µs/passo) | Controle 470 (µs/passo) | 630, 1 ms (µs/passo) | 630, 0,5 ms: fração de 1 núcleo |
+|---|---:|---:|---:|---:|
+| 1 | 51,4 (4,7%) | 50,9 | 78,0 | 15,6% |
+| 2 | 48,1 (4,7%) | 48,4 | 76,2 | 15,6% |
+| 3 | 47,4 (4,7%) | 48,5 | 76,6 | 15,6% |
+
+Leitura: o passo de 630 neurônios com 0,5 ms gasta cerca de 15,6% de um núcleo nesta máquina, contra
+o teto de 25%. O controle sintético bate com a rede real (até 3% de diferença), então a medida é
+confiável também no Windows. Esta máquina é cerca de 1,6 vez mais rápida no passo de 630 do que o
+sandbox da primeira seção.
+
+Uma observação para o M1: a razão entre o passo de 630 e o de 470 aqui é 76,6 / 48,4, cerca de 1,6.
+No sandbox foi cerca de 2,2. A razão depende da máquina e da biblioteca de álgebra linear, então o
+custo tem de ser medido, não extrapolado.
+
+Confirmado pelo Cantyll: essa é a máquina de uso diário, e ela estava na tomada durante as execuções.
+A referência está fechada com essa máquina.
 
 ## Ambiente desta medida
 
@@ -44,12 +93,17 @@ Ou seja, o custo ficou dentro do ruído das medidas anteriores.
 Resumo: **a rede atual gasta cerca de 5,5% de um núcleo**. Uma rede de 630 neurônios com passo de
 0,5 ms gastaria **entre 23% e 27% de um núcleo** nesta máquina (mediana perto de 24%).
 
+Os 23% a 27% são de uma rede sintética de 630 neurônios, que ainda não existe. A rede real de 470,
+que existe, gasta 5,5% na mesma máquina. Não compare o 630 sintético com a rede real como se fossem a
+mesma coisa.
+
 ## Contra os critérios da spec (seção 10)
 
 - "Menos de 0,5 ms por passo para acompanhar o tempo real": **passa com folga**. O passo de 630 custa
   0,12 a 0,14 ms.
 - "Fração de CPU medida, estimativa inicial até 25% de um núcleo": **no limite**. O intervalo medido
   (23% a 27%) cruza o 25%. Não dá para dizer que passa com segurança, e a conta só tem o LIF atual.
+- Na referência (Windows, seção acima), o mesmo passo mede 15,6%: passa com folga, mas só para o LIF atual.
 
 ## Onde a spec errou na conta
 
@@ -67,11 +121,12 @@ Quem quiser a conta correta precisa dessa forma, não de N².
   medido.
 - **Densidade:** a multiplicação densa custa o mesmo com 7% ou 100% de sinapses preenchidas. Um W esparso
   pode ser mais barato, mas isso não foi testado. A spec (linha 270) pede essa decisão antes do M6.
-- **Máquina de referência:** a spec não diz qual é. Esta medida é de um Xeon de nuvem compartilhado.
+- **Máquina de referência:** a medida da nuvem (Xeon compartilhado) não é a referência. A referência
+  tem a medida do Windows, e só ela.
 
 ## Próximos passos (não feitos aqui)
 
-1. Definir a máquina de referência na spec, e rodar este script nela.
+1. Medir de novo na referência sempre que a rede mudar de forma (por exemplo, no M1).
 2. No M1, medir o passo com Izhikevich e o passo com W esparso, nas mesmas condições, antes de fixar D2.
 3. Se o passo de 630 passar de 25% de um núcleo na máquina de referência, a saída é reduzir populações
    ou usar passo de 1 ms (revisar D2), não otimizar no escuro.

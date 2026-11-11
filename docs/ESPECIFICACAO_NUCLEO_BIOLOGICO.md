@@ -13,7 +13,7 @@
 
 ## 1. Regras de projeto
 
-- **R1. Sem culpa.** Nenhum estado cresce ou decai para pressionar a pessoa a voltar. Ausência leva a sono ou repouso, nunca a tristeza ativa. Base: `ARQUITETURA.md`.
+- **R1. Sem culpa.** Nenhum estado cresce ou decai para pressionar a pessoa a voltar. Carência leva a sono ou repouso, nunca a tristeza ativa. Vale para carência em geral, nos dois casos: ausência (você fora do computador) e negligência (você presente, ignorando o pet). Decidido pelo Cantyll em 2026-11-11. Base: `ARQUITETURA.md`.
 - **R2. Reforço só por erro de predição.** Recompensa bruta não reforça comportamentos que chamam atenção, como `PEDIDO`.
 - **R3. Crescimento não é disparado por recompensa bruta.** Vale para sinaptogênese e neurogênese.
 - **R4. Segurança fica fora da rede.** Tela cheia, usuário ausente e limites de execução continuam em código de regras (guardas), que podem vetar qualquer ação da rede.
@@ -129,7 +129,7 @@ Taxa de aprendizado efetiva: η_eff = η · (0,5 + ACh).
 | C (relógio circadiano) | −1 a 1 | C = cos(2π(h − h_pico)/24) | limiar do sono | h_pico configurável |
 
 **Regras dos moduladores:**
-- Durante a ausência, S relaxa para o neutro e nunca sobe (R1).
+- Durante a carência (ausência ou negligência), S relaxa para o neutro e nunca sobe (R1).
 - O termo fixo `0,15 * repressions` em `protesto.py` sai do código e passa para `ajustes.py`.
 
 **Dinâmica de P:** acordado, P' = k_w · (1 − P); dormindo, P' = −k_s · P. Com k_w = 0,1/h, P chega a 0,80 depois de 16 h acordado, valor usado no teste de sono da seção 10.
@@ -191,6 +191,7 @@ Os critérios são valores iniciais, para calibrar.
 | Guarda: tela cheia | estado de tela cheia | travessura bloqueada |
 | Guarda: sem reforço bruto | recompensa com δ = 0 | PEDIDO não cresce |
 | Guarda: ausência (R1) | 3 dias sem usuário | S não sobe; CARTAZ e FUGIR não sobem; o pet dorme em vez de chamar atenção |
+| Guarda: negligência (R1) | você presente e sem interagir por dias (tempo a definir) | S não sobe; nenhuma tristeza ativa; o pet repousa. Pendente: FUGIR e TRAVESSURA ainda sobem com você presente (medido: 4 a 5 Hz e 16 a 18 Hz). Decidir se a guarda de ausência vale aqui |
 | Não regressão | suíte atual | passa; só as contagens 470 e 15.939 são atualizadas |
 | Custo por passo | 630 neurônios, passo de 0,5 ms, máquina de referência | menos de 0,5 ms por passo para acompanhar o tempo real; fração de CPU medida (estimativa inicial: até 25% de um núcleo). Se não couber, revisar D2 e o tamanho das populações |
 | Valor percebido | uma semana de uso real, com o LIF e com a versão nova | a variação do comportamento (intervalos entre ações e distribuição das ações) aumenta, sem sair da faixa de segurança |
@@ -268,7 +269,7 @@ D5 muda a fronteira do projeto. Hoje a rede dá a tendência, e as regras escolh
 - **Calibração:** todos os limiares em Hz, hoje em `ajustes.py`, precisam ser refeitos a cada troca de neurônio ou de passo.
 - **Estado:** mais estado significa mais bugs de save e load. Mitigação: versionamento e roundtrip obrigatório.
 - **Escala:** com matriz densa, o custo cresce com o quadrado do número de neurônios. A poda só economiza se as sinapses forem esparsas; essa escolha de representação deve ser feita antes de M6.
-- **Culpa disfarçada:** S, P e `PEDIDO` podem, juntos, criar pressão para voltar. Mitigação: R1, R2 e o teste de ausência.
+- **Culpa disfarçada:** S, P e `PEDIDO` podem, juntos, criar pressão para voltar. Mitigação: R1, R2 e o teste de ausência. A negligência ainda não tem teste próprio.
 - **Ciência contestada:** dopamina como erro de predição é a hipótese mais sustentada, mas há debate sobre saliência e vigor. Downscaling no sono e serotonina são hipóteses. Cada escolha fica registrada no código.
 - **Privacidade:** em M6, os pesos sinápticos passam a registrar padrões de uso. Mitigação: `PRIVACIDADE.md` atualizado antes.
 - **Valor percebido:** os testes fenomenológicos não dizem se o pet parece mais vivo para quem usa. Mitigação: o critério de valor percebido (seção 10) e a ordem da seção 13, que testa o barato antes do caro.
@@ -278,4 +279,4 @@ D5 muda a fronteira do projeto. Hoje a rede dá a tendência, e as regras escolh
 - Conectoma humano ou de qualquer outro organismo.
 - Neurônios multicompartimentais com parâmetros humanos.
 - Cerebelo, CA3 e giro denteado (opcionais, em fase posterior).
-- Qualquer mecanismo que transforme ausência em cobrança.
+- Qualquer mecanismo que transforme carência (ausência ou negligência) em cobrança.

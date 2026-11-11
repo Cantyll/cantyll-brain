@@ -262,7 +262,7 @@ CONNECTIONS = [
     ("CALM",    "FUGIR",  -0.30, 0.5),
     ("FRUSTRATION", "CARTAZ", 0.25, 0.6),
     ("CALM",    "CARTAZ", -0.20, 0.5),
-    ("GLOOM",   "CANTO",   0.50, 0.6),      # triste (por ignorado, dispensa ou bolinha levada): vai para o cantinho
+    ("GLOOM",   "CANTO",   0.50, 0.6),      # triste (por dispensa ou bolinha levada; ignorado não entra aqui, R1): vai para o cantinho
     ("TIRED",   "CANTO",   0.0,  0.5),      # R1: era 0,05 (cansaço levava ao cantinho). Peso 0 mantém o sorteio dos pesos seguintes
     ("BOREDOM", "TRAVESSURA", 0.30, 0.6),   # entediado apronta
     ("CURIOUS", "TRAVESSURA", 0.20, 0.6),
