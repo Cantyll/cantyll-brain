@@ -1,12 +1,49 @@
 # Custo do passo da rede
 
 Quanto de um núcleo de CPU a rede gasta por segundo simulado. Os números vêm de
-`ferramentas/medir_custo_passo.py`, rodado nesta máquina. Eles não são uma previsão para a máquina
-de referência da spec (seção 10), que ainda não foi definida.
+`ferramentas/medir_custo_passo.py`, rodado em cada máquina. A máquina de referência da spec (seção 10)
+é a proposta da próxima seção, com a primeira medida feita num Windows 11.
 
 Reproduzir:
 
     python ferramentas/medir_custo_passo.py
+
+## Máquina de referência (proposta)
+
+A referência é o computador em que o Pestinha roda no dia a dia de quem o usa. O pet vive no PC de
+quem o usa, então o critério é que ele caiba nesse PC, e não num servidor.
+
+Procedimento:
+
+1. Ligar o computador na tomada, com o modo de energia de desempenho ou equilibrado. Em bateria, o
+   processador costuma reduzir o clock, e a medida fica pior sem motivo.
+2. Rodar `python ferramentas/medir_custo_passo.py` três vezes, sem outros programas pesados abertos.
+3. Registrar a linha "Ambiente" e a tabela das três execuções, e comparar a mediana do passo de 630 neurônios.
+
+Critério: com 630 neurônios e passo de 0,5 ms, a fração de um núcleo fica em até 25% (spec, seção 10).
+Se passar, a saída é reduzir populações ou voltar para passo de 1 ms (D2).
+
+### Primeira medida: Windows 11, 8 núcleos lógicos
+
+Ambiente: Intel família 6 modelo 140, 8 núcleos lógicos, Python 3.15.2, numpy 2.5.4, Windows 11.
+
+| Execução | Real 470, 1 ms (µs/passo) | Controle 470 (µs/passo) | 630, 1 ms (µs/passo) | 630, 0,5 ms: fração de 1 núcleo |
+|---|---:|---:|---:|---:|
+| 1 | 51,4 (4,7%) | 50,9 | 78,0 | 15,6% |
+| 2 | 48,1 (4,7%) | 48,4 | 76,2 | 15,6% |
+| 3 | 47,4 (4,7%) | 48,5 | 76,6 | 15,6% |
+
+Leitura: o passo de 630 neurônios com 0,5 ms gasta cerca de 15,6% de um núcleo nesta máquina, contra
+o teto de 25%. O controle sintético bate com a rede real (até 3% de diferença), então a medida é
+confiável também no Windows. Esta máquina é cerca de 1,6 vez mais rápida no passo de 630 do que o
+sandbox da primeira seção.
+
+Uma observação para o M1: a razão entre o passo de 630 e o de 470 aqui é 76,6 / 48,4, cerca de 1,6.
+No sandbox foi cerca de 2,2. A razão depende da máquina e da biblioteca de álgebra linear, então o
+custo tem de ser medido, não extrapolado.
+
+Confirmado pelo Cantyll: essa é a máquina de uso diário, e ela estava na tomada durante as execuções.
+A referência está fechada com essa máquina.
 
 ## Ambiente desta medida
 
@@ -71,7 +108,7 @@ Quem quiser a conta correta precisa dessa forma, não de N².
 
 ## Próximos passos (não feitos aqui)
 
-1. Definir a máquina de referência na spec, e rodar este script nela.
+1. Medir de novo na referência sempre que a rede mudar de forma (por exemplo, no M1).
 2. No M1, medir o passo com Izhikevich e o passo com W esparso, nas mesmas condições, antes de fixar D2.
 3. Se o passo de 630 passar de 25% de um núcleo na máquina de referência, a saída é reduzir populações
    ou usar passo de 1 ms (revisar D2), não otimizar no escuro.
