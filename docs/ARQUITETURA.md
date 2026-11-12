@@ -154,9 +154,9 @@ Toda leitura e escrita passa por `store.py`:
 
 ## Regras do núcleo biológico (R1 a R7)
 
-Mesmo texto da [especificação do núcleo biológico](ESPECIFICACAO_NUCLEO_BIOLOGICO.md), seção 1. Se as duas divergirem, corrija as duas no mesmo PR.
+Cópia da seção 1 da [especificação do núcleo biológico](ESPECIFICACAO_NUCLEO_BIOLOGICO.md). Nenhum teste compara as duas cópias; esse teste não é deste PR.
 
-- **R1. Sem culpa.** Nenhum estado cresce ou decai para pressionar a pessoa a voltar. Carência leva a sono ou repouso, nunca a tristeza ativa. Vale para carência em geral, nos dois casos: ausência (você fora do computador) e negligência (você presente, ignorando o pet). Decidido pelo Cantyll em 2026-11-11. Base: `ARQUITETURA.md`.
+- **R1. Sem culpa.** Nenhum estado cresce ou decai para pressionar a pessoa a voltar. Carência leva a sono ou repouso, nunca a tristeza ativa. Vale para carência em geral, nos dois casos: ausência (você fora do computador) e negligência (você presente, ignorando o pet). Decidido pelo Cantyll em 2026-11-11. Base: a seção «Regras do projeto», acima neste arquivo.
 - **R2. Reforço só por erro de predição.** Recompensa bruta não reforça comportamentos que chamam atenção, como `PEDIDO`.
 - **R3. Crescimento não é disparado por recompensa bruta.** Vale para sinaptogênese e neurogênese.
 - **R4. Segurança fica fora da rede.** Tela cheia, usuário ausente e limites de execução continuam em código de regras (guardas), que podem vetar qualquer ação da rede.
