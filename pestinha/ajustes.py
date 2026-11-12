@@ -40,6 +40,9 @@ RECOMPENSA_CARINHO = 1.0        # recompensa por segundo de carinho (aprendizado
 PUNICAO_DISPENSA = -0.6         # recompensa negativa depois de dispensar
 DISPENSA_RAPIDA = 3.0           # s: fechou tão rápido assim = dispensa "na cara"
 PENALIDADE_DISPENSA = 1.0       # s em que a dispensa pesa no aprendizado
+HABITUACAO_DISPENSA = 10.0      # dispensas seguidas para o peso no aprendizado cair à metade (0 desliga; core/habituacao.py)
+RECUPERACAO_DISPENSA_H = 8.0    # h: constante de tempo em que a habituação à dispensa passa
+DESABITUACAO_CARINHO = 1.0      # fração da habituação à dispensa que um carinho desfaz (0 = nenhuma, 1 = toda)
 
 # ---------------------------------------------------------------------------
 # Física do corpo (núcleo)
@@ -203,6 +206,9 @@ _LIMITES = {
     "PUNICAO_DISPENSA": (float, -10.0, 0.0),
     "DISPENSA_RAPIDA": (float, 0.0, 60.0),
     "PENALIDADE_DISPENSA": (float, 0.0, 60.0),
+    "HABITUACAO_DISPENSA": (float, 0.0, 1000.0),
+    "RECUPERACAO_DISPENSA_H": (float, 0.01, 168.0),
+    "DESABITUACAO_CARINHO": (float, 0.0, 1.0),
     "GRAVIDADE": (float, 0.0, 100000.0),
     "QUICA": (float, 0.0, 1.0),
     "ATRITO_CHAO": (float, 0.0, 100.0),
