@@ -13,7 +13,7 @@
 - Replay noturno (M3): ao dormir, até 50 episódios, os mais marcantes, voltam à rede por 0,5 s cada, com δ = 0,5 · δ. Cada episódio passa a guardar o nível dos sentidos naquele momento (`sentidos` em `episodes.jsonl`). Episódios antigos, sem esse dado, não entram no replay.
 - Replay e homeostase sináptica valem pela dívida de sono, não por adormecer. Antes, acordar no meio da noite (carinho, susto, o app reaberto) e dormir de novo refazia o replay de 50 episódios e mais 20% de SHY a cada vez. Agora cada sono cobra a pressão de sono que subiu desde o ponto mais baixo do último sono: uma noite de dívida vale o sono completo de antes; menos que isso vale a parte dela. Uma noite inteira, sem acordar, fica igual a antes.
 - Homeostase sináptica no sono (SHY, decisão D4): ao adormecer, cada sinapse aprendida perde 20%, e o replay para de empurrar uma sinapse ao chegar a 50% do seu limite. Antes, a tristeza de episódios negativos subia ao teto e ficava lá: 4,8 Hz em 30 noites de uso misto. Com a homeostase, o peso fica perto de 0,02 e a tristeza fica entre 0,2 e 1 Hz nas simulações (dias 10 a 30).
-- Problema aberto: a brincadeira (PLAYFUL) cai a zero nas simulações de 30 noites, com ou sem homeostase. O replay por |δ| traz quase só episódios negativos, e a brincadeira não se recupera sozinha.
+- Problema aberto: sem homeostase, a brincadeira (PLAYFUL) cai a zero em 30 noites de uso pesado. Com a homeostase, no dia 30 ela fica em 0,87 Hz com 20 dispensas e 10 carinhos por dia, em 1,3 Hz com 5 e 3, e em 1,6 Hz com 2 e 20. São números de simulação, com learn_rate normal e habituação restaurada a cada dia; as suposições de uso não foram medidas.
 
 ### Novidades internas
 - Licença GPL-3.0-or-later, com o arquivo `NOTICE`.
