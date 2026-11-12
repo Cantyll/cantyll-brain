@@ -1,7 +1,7 @@
 # Especificação: núcleo neural biológico do Pestinha
 
-**Versão:** 0.1 (rascunho para decisão)
-**Estado:** nenhum código foi alterado. Este documento define o que construir, em que ordem e como testar.
+**Versão:** 0.2 (alinhada com a main e com a visão, 2026-11-12)
+**Estado:** M0 está na main. M3 está na main (o PR #5 trouxe o replay e a homeostase sináptica), com dois critérios da seção 10 ainda sem teste (ritmo diário e replay). M1, M2 e M4 a M7 não começaram. A seção 13 diz o que falta e qual PR do plano cuida de cada fase. Este documento define o que construir, em que ordem e como testar.
 **Origem:** decisões tiradas das conversas sobre SNN, neurônios biológicos e humanos, neuromoduladores, sinaptogênese e neurogênese.
 
 ## 0. Objetivo e critério de sucesso
@@ -18,7 +18,7 @@
 - **R3. Crescimento não é disparado por recompensa bruta.** Vale para sinaptogênese e neurogênese.
 - **R4. Segurança fica fora da rede.** Tela cheia, usuário ausente e limites de execução continuam em código de regras (guardas), que podem vetar qualquer ação da rede.
 - **R5. Biologia como fonte de fenômenos testáveis, não como cópia.** Cada parte tem nome biológico, função e teste.
-- **R6. Privacidade.** A rede recebe as mesmas categorias que `sense/senses.py` já produz. O estado salvo tem contagens e pesos, nunca títulos ou conteúdo. Base: `PRIVACIDADE.md`.
+- **R6. Privacidade.** A rede recebe as mesmas categorias que `sense/senses.py` já produz. O estado salvo tem contagens e pesos, nunca títulos ou conteúdo. A gravação dos sentidos para gêmeos de ablação (V6) é outro arquivo: exige permissão própria e fica desligada por padrão. Base: `PRIVACIDADE.md`.
 - **R7. Mudança por fase, reversível.** Cada fase é ligada por configuração. O LIF continua disponível até o novo núcleo passar nos testes.
 
 ## 2. Fronteira do sistema
@@ -74,7 +74,8 @@ Relógio, sono, pressão de sono, serotonina, arousal, acetilcolina e δ são va
   - FS (disparo rápido, inibitório): a = 0,1; b = 0,2; c = −65; d = 2.
   - IB (rajadas intrínsecas): a = 0,02; b = 0,2; c = −55; d = 4.
   - CH (chattering): a = 0,02; b = 0,2; c = −50; d = 2.
-- **Uso:** córtex excitatório = RS; córtex inibitório = FS; SUSTO = RS com ganho de entrada maior; D1 e D2 = RS; GPi = FS com entrada tônica; expressão motora = RS.
+  - LTS (limiar baixo, adaptação e ritmo lento): a = 0,02; b = 0,25; c = −65; d = 2.
+- **Uso:** córtex excitatório = RS; córtex inibitório = FS; SUSTO = RS com ganho de entrada maior; D1 e D2 = RS; GPi = FS com entrada tônica; expressão motora = RS. Proposta da visão (seção 5.1), ainda sem população na seção 4: drives e humor = IB e CH; modelo do eu e sono = LTS; winner-take-all do workspace = FS.
 - **Sinapses:** corrente exponencial, com τ ≈ 5 ms para o tipo AMPA e ≈ 10 ms para o tipo GABA (valores típicos, ajustar).
 - **Adaptação:** a variável u substitui `adapt_b` e `adapt_tau`.
 - **Escala de pesos:** deve ser recalibrada, porque a corrente é em unidades do modelo.
@@ -85,7 +86,7 @@ Relógio, sono, pressão de sono, serotonina, arousal, acetilcolina e δ são va
 - **Passo de integração:** 0,5 ms (decisão D2). Em cada milissegundo, v é atualizado em duas metades, como no artigo original.
 - **`step(dt_real)`:** o número de passos é `dt_real / 0,5 ms`, com teto de 1 s por chamada, para o caso de o computador ter dormido.
 - **Pausa do pet:** a rede não avança, e todo o estado, incluindo P, A, ACh e S, fica congelado. O relógio circadiano segue a hora local e continua andando durante a pausa.
-- **Custo:** o LIF atual integra a cada 1 ms (`nervous_system.py`, linhas 589 e 590). Com passo de 0,5 ms e 630 neurônios, a multiplicação densa atual custaria cerca de 3,6 vezes mais por segundo simulado (2 × (630/470)²). Por isso o critério de custo da seção 10 é obrigatório.
+- **Custo:** o LIF atual integra a cada 1 ms (`LIFBrain.step`, em `nervous_system.py`). Com passo de 0,5 ms e 630 neurônios, a multiplicação densa atual custaria cerca de 3,6 vezes mais por segundo simulado (2 × (630/470)²). Por isso o critério de custo da seção 10 é obrigatório.
 - **Replay noturno** pode rodar mais rápido que o tempo real, porque o pet está dormindo.
 
 ## 7. Conexões e plasticidade
@@ -100,19 +101,22 @@ Cada `Projecao` tem: populações de origem e destino, lista de sinapses (índic
 - **Fim do sinal fixo por população** (`PLASTIC_POSTS`). O sinal passa a vir do receptor.
 
 ### 7.3 Escalonamento homeostático
-Cada população tem uma taxa-alvo r*, em Hz por neurônio, definida pela taxa medida na fase M1. A cada hora acordado, e também durante o sono, os pesos de entrada são escalados em até ±5% por ajuste.
+Cada população teria uma taxa-alvo r*, em Hz por neurônio. A cada hora acordado, e também durante o sono, os pesos de entrada seriam escalados em até ±5% por ajuste. **Cancelado pelo Cantyll em 2026-11-12: o piso por taxa-alvo não será implementado.** O desenho acima fica só como registro. Ele não estava completo: (a) r* seria a taxa medida na fase M1, mas o B2 roda antes do M1, no LIF, então o B2 tem de definir de onde sai r*; (b) o texto não diz se o ajuste escala `learned` (30 canais × 4 populações, a única parte plástica do LIF), `W_base` ou outra coisa, nem o que significa ±5%.
+
+**Prioridade (visão, seção 10): cancelada.** A visão pôs o piso como prioridade porque a simulação antiga mostrava a PLAYFUL a zero. Na reprodução de 2026-11-12 (seção 9.4), ela não zera com a homeostase atual: vai de 2,47 Hz no dia 0 para 0,87 Hz no dia 30. Com o piso cancelado, a PLAYFUL segue sem piso. O PR #8 (B2, não mesclado) relata que, num cenário sem carinho, quem cai é a CALM, não a PLAYFUL; esses números são dele e não estão reproduzidos aqui. Sem piso, esse cenário fica sem contenção. O CHANGELOG da `main` ainda registra a queda a zero como problema aberto; a correção aguarda o Cantyll. O piso por taxa-alvo não está no código e não entra. Na main há só o downscaling do sono e o teto do replay (seção 9.4).
 
 ### 7.4 Acetilcolina
 Taxa de aprendizado efetiva: η_eff = η · (0,5 + ACh).
 
 ### 7.5 Sinaptogênese e poda (fase M6)
+Aplicadas ao dormir, junto com o replay e o SHY. Acordado, a rede só acumula contadores (visão, seção 7).
 - **Criar:** um par pré e pós com coincidência acumulada acima de um limiar, numa janela de 1 h, e com δ médio positivo no mesmo período (R3). Peso inicial: 0,01.
 - **Podar:** peso com |w| < 0,002 por 6 h de uso, ou sinapse sem disparo pré por 24 h.
 - **Limite:** no máximo o dobro do grau médio inicial, cerca de 34 entradas por neurônio.
 
 ### 7.6 Neurogênese (fase M7, opcional; decisão D9)
 - **Gatilho:** erro persistente em contexto novo (novidade) e pool saturado, com taxa média acima de 0,8 do máximo.
-- **Teto:** 800 neurônios.
+- **Teto:** 1500 neurônios, decidido pelo Cantyll em 2026-11-12 (V2, ver D9). Como a sinaptogênese, a mudança é aplicada ao dormir.
 - **Entrada:** o neurônio novo recebe sinapses de parceiros co-ativos, com peso de saída pequeno (0,2 vez a média) e uma janela de maturação de 48 h de uso acordado. Durante a maturação, ele é mais excitável e mais plástico.
 - **Morte:** se não atingir taxa mínima ao fim da maturação, é removido.
 - **Custo:** a pressão de sono cresce mais rápido com mais neurônios. Fórmula: k_w = 0,1/h × (N / 630).
@@ -125,7 +129,7 @@ Taxa de aprendizado efetiva: η_eff = η · (0,5 + ACh).
 | A (noradrenalina, arousal) | 0 a 1 | tédio e sons aumentam; fadiga reduz | ganho global de (0,8 + 0,4·A); limiares de `ajustes.py` multiplicados por (1 + 0,2·(A − 0,5)) | τ = 60 s |
 | ACh (acetilcolina, atenção) | 0 a 1 | atividade média do pool FOCUS | taxa de aprendizado e porta talâmica | τ = 30 s |
 | S (serotonina, estado lento) | −1 a 1 | média de δ ao longo do tempo | sensibilidade a punição; substitui o acumulador de queixa de `protesto.py` | τ = 2 h |
-| P (pressão de sono, adenosina) | 0 a 1 | tempo acordado | gatilho do sono | sobe com k_w; cai com k_s = 0,35/h dormindo |
+| P (pressão de sono, adenosina) | 0 a 1 | tempo acordado | gatilho do sono | sobe com k_w; cai com k_s dormindo: 0,12/h (desvio confirmado no PR #1, seção 14) |
 | C (relógio circadiano) | −1 a 1 | C = cos(2π(h − h_pico)/24) | limiar do sono | h_pico configurável |
 
 **Regras dos moduladores:**
@@ -157,22 +161,34 @@ Para cada ação a em SENTAR, FUGIR, CARTAZ, CANTO, TRAVESSURA, PAPEL e ACEITAR:
 - Entre as ações liberadas, vence a de GPi mais baixo, com inibição lateral entre canais.
 - As guardas (R4) podem vetar a ação antes da execução.
 
-Esta é a mudança de fronteira mais importante do projeto (decisão D5). Hoje os sete motores de decisão já competem por inibição lateral (peso −0,05, 70% das conexões; `nervous_system.py`, linhas 453–458), e cada um vira ação por regra própria: limiar, sorteio com ganho ou ambos, espalhados por `ajustes.py` e `mind/`. A BG muda quem libera a ação, não a existência de competição. A escolha de *qual* travessura (meme, foto, bilhete, atravessar, nada) continua em `episodic.py`; a BG decide só se TRAVESSURA vence.
+Esta é a mudança de fronteira mais importante do projeto (decisão D5). Hoje os sete motores de decisão já competem por inibição lateral (peso −0,05, 70% das conexões; `nervous_system.py`, constante `LATERAL_INHIBITION`), e cada um vira ação por regra própria: limiar, sorteio com ganho ou ambos, espalhados por `ajustes.py` e `mind/`. A BG muda quem libera a ação, não a existência de competição. A escolha de *qual* travessura (meme, foto, bilhete, atravessar, nada) continua em `episodic.py`; a BG decide só se TRAVESSURA vence.
 
 ### 9.3 Respiração (gerador de padrão)
 Oscilador de fase φ, com frequência f = 0,25 Hz + 0,5·A. Saída: escala corporal s = 1 + 0,03·sen(φ), enviada ao `MotorTone`.
 
 ### 9.4 Replay noturno
-Durante o sono, são escolhidos 50 episódios de `episodic.py`, por prioridade de |δ| e recência. Cada episódio reativa o padrão pré-sináptico por 0,5 s, com δ_replay = 0,5 · δ registrado. `consolidate()` continua atualizando a tabela do bandit. Downscaling sináptico no sono (hipótese SHY) fica ligado (decisão D4, Cantyll, 2026-11-11): ao adormecer, cada sinapse aprendida perde 20% (`HOMEOSTASE_SHY`), e o replay para de empurrar uma sinapse ao chegar a 50% do seu limite (`HOMEOSTASE_TETO`). Sem isso, a tristeza de episódios negativos subia ao teto e ficava lá (medido: 4,8 Hz em 30 noites de uso misto).
+Durante o sono, `episodic.escolher_replay()` escolhe até 50 episódios (`REPLAY_EPISODIOS`), por |valência| vezes recência. A recência conta episódios, não tempo (meia-vida de 150 episódios, `RECENCY_HALF_LIFE`); em empate, vai o mais novo. Só entram episódios com o padrão sensorial guardado (campo `sentidos`, desde o PR #5) e com valência diferente de zero. Cada episódio reativa o padrão sensorial guardado por 0,5 s (`REPLAY_MS`). O replay usa até 100 ms de simulação por quadro (`REPLAY_MS_POR_FRAME`) até ele acordar. `consolidate()` continua atualizando a tabela do bandit.
 
-### 9.5 Opcionais, fora do escopo inicial
-- Codificação esparsa tipo giro denteado (k-WTA, com k = 5%).
-- Memória tipo CA3 (Hopfield) para episódios.
+**O sinal do replay hoje não é δ = r − V.** `escolher_replay()` devolve a valência vezes `REPLAY_FATOR` (0,5), e `LIFBrain.replay()` a aplica com `expected = 0`, ou seja, como recompensa bruta. O episódio guarda a valência, não um δ. Até o PL-1 (M2), que passa a usar δ = r − V, o replay não cumpre a R2.
+
+Downscaling sináptico no sono (hipótese SHY) está ligado (decisão D4, Cantyll, 2026-11-11) e na main desde o PR #5. Cada vez que ele adormece, antes do replay, cada sinapse aprendida perde 20% (`HOMEOSTASE_SHY`; função `downscaling` em `core/homeostase_sinaptica.py`). É por adormecer, não por noite: acordar e voltar a dormir na mesma noite desfaz mais 20% (`test_downscaling_do_sono_acontece_uma_vez_por_sono`). Durante o replay, o empurrão no mesmo sentido perde força de forma linear à medida que a sinapse se aproxima de 50% do seu limite (`HOMEOSTASE_TETO`; função `saturacao`): perde metade da força a 25% do limite e zera em 50%. Os limites são assimétricos (LEARN_MAX = 0,08 e LEARN_MIN = −0,05), então o empurrão para em +0,04 e em −0,025. Puxar de volta para zero não é freado. Sem isso, a tristeza de episódios negativos subia ao teto e ficava lá. A simulação de 30 noites, que ainda não está no repositório, precisa contar cada sono, e não cada noite.
+
+**Conserto aprovado em 2026-11-12 como B4 do plano, ainda não na `main`: replay e SHY passam a ser cobrados pela dívida de sono, não a cada adormecer.** O B2 tentou repartir só o SHY pela pressão de sono descarregada, e essa parte saiu do PR #8. Sozinho, isso piorou a noite picada na simulação: o replay continua valendo por adormecer, e a fila de episódios é remontada a cada sono. Este parágrafo descreve a `main`, que ainda cobra por adormecer.
+
+Os números de 30 noites que circularam antes (PLAYFUL a zero; GLOOM a 4,8 Hz sem homeostase) vieram de uma rodada com a taxa de aprendizado de teste (0,004, `LEARN_RATE_PADRAO`) e estão superados. Uma reprodução de 2026-11-12, fora do repositório (semente 7, taxa normal de 0,001, habituação restaurada a cada dia, 20 dispensas e 10 carinhos por dia), dá no dia 30: GLOOM 0,54 Hz e PLAYFUL 0,87 Hz com a homeostase do PR #5; sem homeostase, GLOOM 6,04 Hz e PLAYFUL zero a partir do dia 26. A PLAYFUL parte de 2,47 Hz no dia 0 (antes da primeira noite), cai para 0,87 Hz no dia 30 (35% do início), tem mediana de 1,43 Hz nos dias 21 a 30 (58%) e não zera em nenhum dia com a homeostase. Conferido de novo em 2026-11-12 com `simulacao_m0.py`, fora do repositório: mesmos valores. São simulados, não medidos. Até o B2 publicar `ferramentas/simular_noites.py`, não servem de critério.
+
+### 9.5 Opcional, fora do escopo
 - Modelo direto cerebelar (previsão do efeito do próprio movimento).
+- Giro denteado (codificação esparsa, k-WTA com k = 5%), sem PR no plano.
+- Voz e microfone (V4): fora. O pet lê e escreve texto; o microfone fica em aberto para depois. Som do sistema (V5): fora por enquanto.
+
+### 9.6 Hipocampo rápido (entra no escopo pela visão, seção 6)
+- Hoje a memória episódica guarda só travessuras, com os sentidos do momento (PR #5). A visão quer episódios de qualquer momento marcante, por |δ| alto ou surpresa do modelo do eu (plano: ME-1).
+- Mecanismo candidato, com teste próprio (R5): completação de padrão a partir de uma pista parcial, tipo CA3 (Hopfield). Está no plano como ME-3 (onda 4, `core/bio/assembleias.py`), atrás de ME-1, ME-2 e NE-1. O giro denteado (codificação esparsa, k-WTA com k = 5%) continua fora de escopo (seções 9.5 e 16).
 
 ## 10. Testes de aceitação
 
-Os critérios são valores iniciais, para calibrar.
+Os critérios são valores iniciais, para calibrar. A simulação de 30 noites é critério de aceitação de toda troca de neurônio ou de regra de plasticidade, replay ou homeostase (visão, seção 8; regra 8 do plano).
 
 | Fenômeno | Como testar | Critério inicial |
 |---|---|---|
@@ -181,18 +197,25 @@ Os critérios são valores iniciais, para calibrar.
 | Bloqueio (Kamin) | treina A→R; depois AB→R | aprendizado de B < 20% do aprendizado de A isolado |
 | Extinção | 30 tentativas sem recompensa | resposta cai ≥ 70% |
 | Surpresa | recompensa inesperada vs. esperada | plasticidade ≥ 2× na inesperada |
-| Ritmo diário | mesma entrada às 10 h e às 23 h | atividade motora difere ≥ 15% |
+| Ritmo diário (aberto) | mesma entrada às 10 h e às 23 h | atividade motora difere ≥ 15%. Em aberto: o relógio só é lido em `mind/sleep.py`, e a rede não recebe a hora. O canal de hora (LAR-2 do plano) a põe na rede |
 | Sono por pressão | 16 h simuladas acordado | P ≈ 0,8; sono só começa com P > 0,75 e C < 0,2 |
-| Replay | sono com episódios marcados | probabilidade da ação preferida muda ≥ 10 pontos |
+| Replay (aberto) | sono com episódios marcados | probabilidade da ação preferida muda ≥ 10 pontos. Em aberto: `tests/test_replay.py` testa o sinal do peso e o tamanho da fila, não este critério |
+| Homeostase sináptica (SHY) e teto do replay (feito, PR #5) | `tests/test_homeostase_sinaptica.py`: o sono desfaz 20% do aprendido, e o empurrão do replay para no teto | cada sono multiplica o aprendido por 0,8; o empurrão para de crescer em 50% do limite; puxar a zero não é freado |
 | Porta talâmica | sono reduz a entrada sensorial | entrada cai ≥ 50%; estímulo acima de 0,9 passa |
 | Respiração | 60 s parado, com A fixo | frequência ≈ 0,25 Hz; amplitude estável |
 | Retenção (M6) | aprende um padrão; faz 5 aprendizados novos; testa o primeiro | ≥ 80% de reprodução |
+| Sinaptogênese e poda (M6, pendente, CR-1) | limite de grau e custo do passo | grau no máximo o dobro do inicial; custo dentro do orçamento; sinapse nova só com δ médio positivo (R3) |
+| Neurogênese (M7, V2 decidida: teto de 1500; CR-2) | neurônios novos com maturação | neurônio novo sobrevive só se for recrutado; teto respeitado |
+| Simulação de 30 noites (B2; piso cancelado em 2026-11-12) | `ferramentas/simular_noites.py`, com semente fixa | GLOOM no dia 30 ≤ [valor a definir] Hz, ou ≤ [fração a definir] do valor sem homeostase (referência a ser refeita pelo B2, seção 9.4); um comando reproduz o resultado. O critério da PLAYFUL sai com o piso. **Os números do GLOOM são decisão pendente do Cantyll. Sem eles, o B2 não tem critério de aceitação** |
+| Noite picada (B4, aprovado em 2026-11-12; ainda não na `main`) | `ferramentas/simular_noites.py` com `--sonos 1` e `--sonos 6`, semente fixa | Com 1 sono por noite, a taxa de cada população plástica no dia 30 fica dentro da faixa das 5 sementes da `main`. Com 6 sonos por noite, PLAYFUL, CALM e GLOOM ficam a no máximo 15% do valor de 1 sono |
+| Hipocampo: episódio sem travessura entra no replay (pendente, ME-1) | replay com episódios de qualquer momento marcante | o replay não colapsa para só episódios negativos |
+| Lembrança por pista parcial (pendente, ME-3) | metade do padrão como pista, em assembleia recorrente | a assembleia reativa o resto acima do acaso; padrões diferentes não se misturam |
 | Determinismo | save → load → step, com semente fixa | spikes idênticos |
 | Guarda: tela cheia | estado de tela cheia | travessura bloqueada |
 | Guarda: sem reforço bruto | recompensa com δ = 0 | PEDIDO não cresce |
 | Guarda: ausência (R1) | 3 dias sem usuário | S não sobe; CARTAZ e FUGIR não sobem; o pet dorme em vez de chamar atenção |
 | Guarda: negligência (R1) | você presente e sem interagir por dias (tempo a definir) | S não sobe; nenhuma tristeza ativa; o pet repousa. Pendente: FUGIR e TRAVESSURA ainda sobem com você presente (medido: 4 a 5 Hz e 16 a 18 Hz). Decidir se a guarda de ausência vale aqui |
-| Não regressão | suíte atual | passa; só as contagens 470 e 15.939 são atualizadas |
+| Não regressão | suíte atual | passa; só as contagens 470 neurônios e 15.808 sinapses (semente 7) são atualizadas |
 | Custo por passo | 630 neurônios, passo de 0,5 ms, máquina de referência | menos de 0,5 ms por passo para acompanhar o tempo real; fração de CPU medida (estimativa inicial: até 25% de um núcleo). Se não couber, revisar D2 e o tamanho das populações |
 | Valor percebido | uma semana de uso real, com o LIF e com a versão nova | a variação do comportamento (intervalos entre ações e distribuição das ações) aumenta, sem sair da faixa de segurança |
 
@@ -202,21 +225,22 @@ Os critérios são valores iniciais, para calibrar.
 - **Saves do LIF:** não são convertidos (decisão D7). A memória episódica é separada e continua valendo.
 - **Determinismo:** a semente é registrada, e o teste de roundtrip é obrigatório.
 - **`config.py`:**
-  - `"cerebro": "lif"` ou `"bio"` (padrão `"lif"` até M2 passar nos testes);
+  - `"cerebro": "lif"` ou `"bio"` (padrão `"lif"`; a troca para `"bio"` depende só do portão D do plano (V7 decidida em 2026-11-12: sem semana de uso real));
   - `"cerebro_debug": false` (painel de moduladores).
 - **`pets/*.json`:**
-  - `"pico_vigilia_h"` (exemplo: 23; decisão D8);
+  - `"pico_vigilia_h"` (padrão 16 h, `PICO_VIGILIA_H` em `ajustes.py`; `bryan.json` e `jorge.json` usam 16; decisão D8);
   - temperamento: os multiplicadores atuais continuam valendo sobre as entradas. Novos multiplicadores podem agir sobre η e sobre A.
 
 ## 12. Arquivos afetados
 
-Com a ordem da seção 13, M2 a M6 podem ser feitas no `LIFBrain` antes de existir `BioBrain`. `bio_brain.py` só é necessário para M1 (decisão D10).
+Ordem decidida (V1, aprovada pelo Cantyll em 2026-11-12; D10): o trabalho novo do núcleo vai só no `BioBrain`. M2, M5 e M6 entram nele depois da paridade (T2), e o `LIFBrain` congela depois do B2. O padrão do código segue `LIFBrain` até o portão D do plano: a V7, decidida em 2026-11-12, dispensa a semana de uso real. O que já está na main aparece marcado como feito.
 
-- `pestinha/core/bio_brain.py` (novo): `BioBrain(Brain)`, `Neuronio`, `Pool`, `Projecao`, `Neuromod`, `PortaTalamica`, `Estriado`, `Respiracao`.
-- `pestinha/core/nervous_system.py`: a interface `Brain` ganha `estado()` e uma nova assinatura de `learn`. `LIFBrain` fica como base de comparação.
+- `pestinha/core/bio/` (pacote novo, T2 do plano): `BioBrain(Brain)` e `Pool` em `rede.py`; `Neuronio` em `neuronios.py`; `Projecao` em `projecoes.py`; `Neuromod` em `moduladores.py`; `PortaTalamica` em `talamo.py`. `Estriado` espera a D5 (M4). `Respiracao` vai para `core/respiracao.py` (TA-1 do plano).
+- `pestinha/core/nervous_system.py`: feito até o PR #5. `Brain` tem `estado()` (M0), `replay()` e `downscaling_sono()` (PR #5), e `learn` aceita `teto` (PR #5). Pendente: B2 (acrescenta `taxas()`, opcional e com `{}` por padrão, à interface `Brain`) e T2 (mexe em `criar_cerebro`). `LIFBrain` congela depois do B2 e fica como base de comparação.
+- `pestinha/core/homeostase_sinaptica.py`: feito no PR #5. `downscaling` e `saturacao`, funções puras sobre a matriz de sinapses aprendidas.
 - `pestinha/core/conditioning.py`: expõe o V esperado do cue ativo.
-- `pestinha/core/episodic.py`: API de replay, com seleção por |δ| e recência.
-- `pestinha/mind/sleep.py`: gatilho por P e C, com histerese.
+- `pestinha/core/episodic.py`: feito no PR #5. `escolher_replay()` (seleção por |valência| vezes recência) e o campo `sentidos` em cada episódio.
+- `pestinha/mind/sleep.py`: gatilho por P e C, com histerese, em `core/ritmo.py` (feito). Fila de replay e SHY, feitos no PR #5.
 - `pestinha/core/homeostasis.py`: a energia continua; P passa a ser o gatilho de sono.
 - `pestinha/core/protesto.py`: o acumulador vira S, e o termo fixo `0,15 * repressions` sai.
 - `pestinha/core/motor.py`: recebe a escala do CPG.
@@ -233,35 +257,43 @@ Cada fase entra como pull requests pequenos, validados no CI que já roda em Win
 
 ## 13. Fases
 
-| Fase | Conteúdo | Esforço | Pronto quando |
-|---|---|---|---|
-| M0 | Interface `Brain` nova (tempo real, `learn(reward, expected, dt)`, `estado()`), versionamento e roundtrip | baixo | testes atuais passam; roundtrip idêntico |
-| M1 | Izhikevich, passo de 0,5 ms, tipos RS e FS | alto (recalibra todos os limiares) | padrões RS, FS e IB reproduzidos; atividade calibrada; custo por passo dentro do orçamento |
-| M2 | Moduladores, regra de três fatores explícita, ACh | médio | habituação, aprendizado por δ, bloqueio, extinção e surpresa passam |
-| M3 | Sono por P, relógio circadiano, replay noturno | médio | testes de ritmo, sono e replay passam |
-| M4 | Gânglios da base (D1 e D2) e guardas | alto | a seleção surge do balanço D1 e D2; guardas vetam tela cheia |
-| M5 | Porta talâmica, via rápida de susto e respiração | médio | testes de porta, via rápida e respiração passam |
-| M6 | Sinaptogênese, poda, teste de retenção e atualização de `PRIVACIDADE.md` | médio-alto | retenção ≥ 80% após 5 aprendizados novos |
-| M7 | Neurogênese com maturação e teto (opcional) | alto | neurônios novos sobrevivem só quando recrutados; teto respeitado |
+| Fase | Conteúdo | Esforço | Pronto quando | Estado (2026-11-12) |
+|---|---|---|---|---|
+| M0 | Interface `Brain` nova (tempo real, `learn(reward, expected, dt)`, `estado()`), versionamento e roundtrip | baixo | testes atuais passam; roundtrip idêntico | Feito no LIF (`tests/test_nucleo_m0.py`) |
+| M1 | Izhikevich, passo de 0,5 ms, tipos RS, FS, IB, CH e LTS | alto (recalibra todos os limiares) | padrões de disparo de cada tipo reproduzidos; atividade calibrada; custo por passo dentro do orçamento | Não começou. Migração decidida (D1). Plano: T2, depois NE-1 a NE-4 |
+| M2 | Moduladores, regra de três fatores explícita, ACh | médio | habituação, aprendizado por δ, bloqueio, extinção e surpresa passam | Não começou. Plano: PL-1 e PL-2 |
+| M3 | Sono por P, relógio circadiano, replay noturno | médio | testes de ritmo, sono e replay passam | Feito: sono por P e C em `core/ritmo.py`; replay e SHY no PR #5. Em aberto (seção 10): ritmo diário e critério do replay |
+| M4 | Gânglios da base (D1 e D2) e guardas | alto | a seleção surge do balanço D1 e D2; guardas vetam tela cheia | D5 adiada até depois do PL-1 na `main`. Fora do plano |
+| M5 | Porta talâmica, via rápida de susto e respiração | médio | testes de porta, via rápida e respiração passam | Não começou. Plano: TA-1 e TA-2 |
+| M6 | Sinaptogênese, poda, teste de retenção e atualização de `PRIVACIDADE.md` | médio-alto | retenção ≥ 80% após 5 aprendizados novos | Não começou. Plano: CR-1, ME-2 e DOC-P3 (`PRIVACIDADE.md` antes do CR-1) |
+| M7 | Neurogênese com maturação e teto (opcional) | alto | neurônios novos sobrevivem só quando recrutados; teto respeitado | V2 decidida (teto de 1500). Plano: CR-2 |
 
-**Ordem recomendada:** M0, M3, M2, M5 e M6, todas sobre o LIF atual. M3 vem antes de M1 porque `sleep.py`, `homeostasis.py` e `episodic.py` não referenciam o modelo de neurônio, e M3 é o que a pessoa percebe primeiro. Só M1 troca o neurônio. Decida M1 depois de ver o resultado de M3 e M2: se a diferença já aparecer, M1 pode nem ser necessária. M4 exige aprovação de D5. M7 fica fora do plano inicial.
+Os PRs do plano citados na coluna Estado que moram em `core/bio/` (TA-2, CR-1, ME-2 e CR-2) seguem a V1, aprovada. TA-1 (`core/respiracao.py`) e DOC-P3 (`PRIVACIDADE.md`) não dependem dela. CR-3 (plasticidade que diminui por população, `core/bio/crescimento.py`) não é sinaptogênese, por isso não entra no M6; também fica em `core/bio/`.
+
+**Ordem vigente (na main):** M0 e M3 já estão no LIF. M3 vem antes de M1 porque `sleep.py`, `homeostasis.py` e `episodic.py` não referenciam o modelo de neurônio, e M3 é o que a pessoa percebe primeiro. Só M1 troca o neurônio, e a migração para Izhikevich está decidida (2026-11-11), camada por camada. M4 exige a decisão da D5, adiada para depois do PL-1 na `main`. M7 é opcional e fica fora do plano inicial.
+
+**Ordem decidida (V1, 2026-11-12):** M0 e M3 no LIF; depois a paridade do `BioBrain` (T2), M1 por população (NE-1 a NE-4), e só então M2, M5 e M6 no `BioBrain`. O `LIFBrain` congela depois do B2.
+
+Os códigos T, NE, PL, TA, CR e ME são os do `PLANO_DE_EXECUCAO_CANTYLL.md`.
 
 ## 14. Decisões pendentes
 
 | ID | Decisão | Padrão adotado | Alternativa | Impacto |
 |---|---|---|---|---|
-| D1 | Neurônio padrão | Izhikevich | CAdEx só no córtex | calibração |
+| D1 | Neurônio padrão | Izhikevich, decidido em 2026-11-11 (migração camada por camada) | CAdEx só no córtex | calibração |
 | D2 | Passo de integração | 0,5 ms | 0,25 ms (mais estável, mais caro) | custo por passo |
 | D3 | Crítico do δ | V de `conditioning.py` | crítico próprio na rede | acoplamento |
-| D4 | Downscaling no sono (hipótese SHY) | ligado, decidido pelo Cantyll em 2026-11-11: −20% por sono, replay com teto de 50% do limite | desligado | ciência contestada |
-| D5 | A BG (D1 e D2) passa a liberar as ações, no lugar das regras atuais de limiar e sorteio; guardas continuam | sim, em M4 | manter as regras; a rede já compete por inibição lateral | previsibilidade (ex.: travessura) e a regra de `ARQUITETURA.md` |
+| D4 | Downscaling no sono (hipótese SHY) | ligado, decidido pelo Cantyll em 2026-11-11: −20% por sono, replay com teto de 50% do limite (na main desde o PR #5; o B4 do plano, aprovado em 2026-11-12, passa a cobrar replay e SHY pela dívida de sono, ainda não na main) | desligado | ciência contestada |
+| D5 | A BG (D1 e D2) passa a liberar as ações, no lugar das regras atuais de limiar e sorteio; guardas continuam | sim, em M4 (adiada pelo Cantyll em 2026-11-12: decidida só depois do PL-1 estar na `main`) | manter as regras; a rede já compete por inibição lateral | previsibilidade (ex.: travessura) e a regra de `ARQUITETURA.md` |
 | D6 | Gatilho do sono | pressão P com relógio C | manter a energia | ritmo |
 | D7 | Saves do LIF | não convertidos; memória episódica preservada | conversão | o pet começa a rede do zero |
-| D8 | Pico circadiano | configurável por pet; exemplo 23 h | fixo | personalização |
-| D9 | Neurogênese | desligada por padrão; teto de 800 | ligada desde o início | risco de inchaço |
-| D10 | Onde vivem M2 a M6 | no `LIFBrain` atual (recomendado) | no `BioBrain`, junto com M1 | evita refazer a calibração duas vezes |
+| D8 | Pico circadiano | configurável por pet; 16 h (padrão, `bryan` e `jorge`; o exemplo original era 23 h) | fixo | personalização |
+| D9 | Neurogênese | ligada por configuração, com teto de 1500 neurônios (decidido pelo Cantyll em 2026-11-12, V2). Ainda não existe na main | ligada desde o início | risco de inchaço |
+| D10 | Onde vivem M2 a M6 | no `BioBrain`, com o `LIFBrain` congelado depois do B2 (decidido pelo Cantyll em 2026-11-12, V1). O padrão do código segue `LIFBrain` até o portão D do plano (V7 decidida em 2026-11-12: sem semana de uso real) | no `LIFBrain` atual, como estava | evita refazer a calibração duas vezes |
 
 D5 muda a fronteira do projeto. Hoje a rede dá a tendência, e as regras escolhem as opções e a execução (`ARQUITETURA.md`). Precisa de aprovação explícita antes de M4.
+
+Desvios da spec já confirmados pelo Cantyll no PR #1 (2026-11-09), que continuam valendo: K de sono de 0,12/h, e não 0,35/h (com 0,35/h o sono dava só 3,7 h); pico de vigília de 16 h nos pets, e não 23 h (exemplo da spec, D8).
 
 ## 15. Riscos
 
@@ -278,5 +310,5 @@ D5 muda a fronteira do projeto. Hoje a rede dá a tendência, e as regras escolh
 
 - Conectoma humano ou de qualquer outro organismo.
 - Neurônios multicompartimentais com parâmetros humanos.
-- Cerebelo, CA3 e giro denteado (opcionais, em fase posterior).
+- Cerebelo (opcional, em fase posterior). Giro denteado (codificação esparsa): fora de escopo por enquanto. CA3 não está aqui: entra pelo ME-3 (seção 9.6), com teste próprio.
 - Qualquer mecanismo que transforme carência (ausência ou negligência) em cobrança.
