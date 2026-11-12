@@ -103,7 +103,7 @@ Cada `Projecao` tem: populações de origem e destino, lista de sinapses (índic
 ### 7.3 Escalonamento homeostático
 Cada população teria uma taxa-alvo r*, em Hz por neurônio. A cada hora acordado, e também durante o sono, os pesos de entrada seriam escalados em até ±5% por ajuste. **Esta seção não é implementável como está escrita, e será reescrita depois do B2:** (a) r* seria a taxa medida na fase M1, mas o B2 roda antes do M1, no LIF, então o B2 tem de definir de onde sai r*; (b) o texto não diz se o ajuste escala `learned` (30 canais × 4 populações, a única parte plástica do LIF), `W_base` ou outra coisa, nem o que significa ±5%.
 
-**Prioridade (visão, seção 10):** é o piso que falta para a brincadeira (PLAYFUL) não cair a zero. A queda a zero está registrada como problema aberto no CHANGELOG, a partir de uma simulação que está em revisão (seção 9.4). **Pendente do B2 do plano:** o piso por taxa-alvo ainda não está no código. Esta seção não está implementada; na main há só o downscaling do sono e o teto do replay (seção 9.4).
+**Prioridade (visão, seção 10):** a visão pôs o piso como prioridade porque a simulação antiga mostrava a PLAYFUL a zero. Na reprodução de 2026-11-12 (seção 9.4), ela não zera com a homeostase atual: vai de 2,47 Hz no dia 0 para 0,87 Hz no dia 30. Se o piso ainda é necessário, e para manter a PLAYFUL acima de quanto, é decisão pendente do Cantyll. O CHANGELOG da `main` ainda registra a queda a zero como problema aberto; a correção aguarda o Cantyll. **Pendente do B2 do plano:** o piso por taxa-alvo ainda não está no código. Esta seção não está implementada; na main há só o downscaling do sono e o teto do replay (seção 9.4).
 
 ### 7.4 Acetilcolina
 Taxa de aprendizado efetiva: η_eff = η · (0,5 + ACh).
@@ -173,7 +173,7 @@ Durante o sono, `episodic.escolher_replay()` escolhe até 50 episódios (`REPLAY
 
 Downscaling sináptico no sono (hipótese SHY) está ligado (decisão D4, Cantyll, 2026-11-11) e na main desde o PR #5. Cada vez que ele adormece, antes do replay, cada sinapse aprendida perde 20% (`HOMEOSTASE_SHY`; função `downscaling` em `core/homeostase_sinaptica.py`). É por adormecer, não por noite: acordar e voltar a dormir na mesma noite desfaz mais 20% (`test_downscaling_do_sono_acontece_uma_vez_por_sono`). Durante o replay, o empurrão no mesmo sentido perde força de forma linear à medida que a sinapse se aproxima de 50% do seu limite (`HOMEOSTASE_TETO`; função `saturacao`): perde metade da força a 25% do limite e zera em 50%. Os limites são assimétricos (LEARN_MAX = 0,08 e LEARN_MIN = −0,05), então o empurrão para em +0,04 e em −0,025. Puxar de volta para zero não é freado. Sem isso, a tristeza de episódios negativos subia ao teto e ficava lá. A simulação de 30 noites, que ainda não está no repositório, precisa contar cada sono, e não cada noite.
 
-Os números dessa história (4,8 Hz em 30 noites sem a homeostase; 0,2 a 1 Hz com ela, nos dias 10 a 30) vêm de uma simulação que ainda não está no repositório e está em revisão: ela usou a taxa de aprendizado de teste (0,004, `LEARN_RATE_PADRAO`), e a correção ainda não foi conferida no repositório. Até o B2 criar `ferramentas/simular_noites.py` e publicar a simulação, são resultados simulados, não medidos, e não servem de critério.
+Os números de 30 noites que circularam antes (PLAYFUL a zero; GLOOM a 4,8 Hz sem homeostase) vieram de uma rodada com a taxa de aprendizado de teste (0,004, `LEARN_RATE_PADRAO`) e estão superados. Uma reprodução de 2026-11-12, fora do repositório (semente 7, taxa normal de 0,001, habituação restaurada a cada dia, 20 dispensas e 10 carinhos por dia), dá no dia 30: GLOOM 0,54 Hz e PLAYFUL 0,87 Hz com a homeostase do PR #5; sem homeostase, GLOOM 6,04 Hz e PLAYFUL zero a partir do dia 26. A PLAYFUL parte de 2,47 Hz no dia 0 (antes da primeira noite), cai para 0,87 Hz no dia 30 (35% do início), tem mediana de 1,43 Hz nos dias 21 a 30 (58%) e não zera em nenhum dia com a homeostase. Conferido de novo em 2026-11-12 com `simulacao_m0.py`, fora do repositório: mesmos valores. São simulados, não medidos. Até o B2 publicar `ferramentas/simular_noites.py`, não servem de critério.
 
 ### 9.5 Opcional, fora do escopo
 - Modelo direto cerebelar (previsão do efeito do próprio movimento).
@@ -235,7 +235,7 @@ Ordem vigente (seção 13): M2 a M6 podem ser feitas no `LIFBrain` antes de exis
 - `pestinha/core/nervous_system.py`: feito até o PR #5. `Brain` tem `estado()` (M0), `replay()` e `downscaling_sono()` (PR #5), e `learn` aceita `teto` (PR #5). Pendente: B2 (acrescenta `taxas()` à interface `Brain`) e T2 (mexe em `criar_cerebro`). `LIFBrain` fica como base de comparação.
 - `pestinha/core/homeostase_sinaptica.py`: feito no PR #5. `downscaling` e `saturacao`, funções puras sobre a matriz de sinapses aprendidas.
 - `pestinha/core/conditioning.py`: expõe o V esperado do cue ativo.
-- `pestinha/core/episodic.py`: feito no PR #5. `escolher_replay()` (seleção por |δ| e recência) e o campo `sentidos` em cada episódio.
+- `pestinha/core/episodic.py`: feito no PR #5. `escolher_replay()` (seleção por |valência| vezes recência) e o campo `sentidos` em cada episódio.
 - `pestinha/mind/sleep.py`: gatilho por P e C, com histerese, em `core/ritmo.py` (feito). Fila de replay e SHY, feitos no PR #5.
 - `pestinha/core/homeostasis.py`: a energia continua; P passa a ser o gatilho de sono.
 - `pestinha/core/protesto.py`: o acumulador vira S, e o termo fixo `0,15 * repressions` sai.
@@ -261,10 +261,12 @@ Cada fase entra como pull requests pequenos, validados no CI que já roda em Win
 | M3 | Sono por P, relógio circadiano, replay noturno | médio | testes de ritmo, sono e replay passam | Feito: sono por P e C em `core/ritmo.py`; replay e SHY no PR #5. Em aberto (seção 10): ritmo diário e critério do replay |
 | M4 | Gânglios da base (D1 e D2) e guardas | alto | a seleção surge do balanço D1 e D2; guardas vetam tela cheia | Pendente da D5. Fora do plano |
 | M5 | Porta talâmica, via rápida de susto e respiração | médio | testes de porta, via rápida e respiração passam | Não começou. Plano: TA-1 e TA-2 |
-| M6 | Sinaptogênese, poda, teste de retenção e atualização de `PRIVACIDADE.md` | médio-alto | retenção ≥ 80% após 5 aprendizados novos | Não começou. Plano: CR-1, CR-3, ME-2 e DOC-P3 (`PRIVACIDADE.md` antes do CR-1) |
+| M6 | Sinaptogênese, poda, teste de retenção e atualização de `PRIVACIDADE.md` | médio-alto | retenção ≥ 80% após 5 aprendizados novos | Não começou. Plano: CR-1, ME-2 e DOC-P3 (`PRIVACIDADE.md` antes do CR-1) |
 | M7 | Neurogênese com maturação e teto (opcional) | alto | neurônios novos sobrevivem só quando recrutados; teto respeitado | Pendente da V2. Plano: CR-2 |
 
-**Ordem vigente:** M0 e M3 já estão no LIF. M2, M5 e M6 vêm depois, no `LIFBrain` atual, como a D10 registra. M3 vem antes de M1 porque `sleep.py`, `homeostasis.py` e `episodic.py` não referenciam o modelo de neurônio, e M3 é o que a pessoa percebe primeiro. Só M1 troca o neurônio, e a migração para Izhikevich está decidida (2026-11-11), camada por camada. Decida M1 depois de ver o resultado de M3 e M2: se a diferença já aparecer, M1 pode nem ser necessária. M4 exige aprovação da D5. M7 depende da V2 e fica fora do plano inicial.
+Os PRs do plano citados na coluna Estado que moram em `core/bio/` (TA-2, CR-1, ME-2 e CR-2) supõem a V1. TA-1 (`core/respiracao.py`) e DOC-P3 (`PRIVACIDADE.md`) não. CR-3 (plasticidade que diminui por população, `core/bio/crescimento.py`) não é sinaptogênese, por isso não entra no M6, e também supõe a V1.
+
+**Ordem vigente:** M0 e M3 já estão no LIF. M2, M5 e M6 vêm depois, no `LIFBrain` atual, como a D10 registra. M3 vem antes de M1 porque `sleep.py`, `homeostasis.py` e `episodic.py` não referenciam o modelo de neurônio, e M3 é o que a pessoa percebe primeiro. Só M1 troca o neurônio, e a migração para Izhikevich está decidida (2026-11-11), camada por camada. A V1 decide onde moram M2, M5 e M6, não se o M1 acontece. M4 exige aprovação da D5. M7 depende da V2 e fica fora do plano inicial.
 
 **Ordem da visão, se a V1 for aprovada** (visão, seção 10; pendente): M0 e M3 no LIF; depois a paridade do `BioBrain` (T2), M1 por população (NE-1 a NE-4), e só então M2, M5 e M6 no `BioBrain`. Nesse caso, o `LIFBrain` congela depois do B2.
 

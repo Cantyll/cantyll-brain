@@ -154,7 +154,7 @@ Toda leitura e escrita passa por `store.py`:
 
 ## Regras do núcleo biológico (R1 a R7)
 
-Cópia da seção 1 da [especificação do núcleo biológico](ESPECIFICACAO_NUCLEO_BIOLOGICO.md). Nenhum teste compara as duas cópias; esse teste não é deste PR.
+Cópia da seção 1 da [especificação do núcleo biológico](ESPECIFICACAO_NUCLEO_BIOLOGICO.md), com uma diferença: a base da R1 aponta para a seção Regras do projeto, acima. Nenhum teste compara as duas cópias.
 
 - **R1. Sem culpa.** Nenhum estado cresce ou decai para pressionar a pessoa a voltar. Carência leva a sono ou repouso, nunca a tristeza ativa. Vale para carência em geral, nos dois casos: ausência (você fora do computador) e negligência (você presente, ignorando o pet). Decidido pelo Cantyll em 2026-11-11. Base: a seção «Regras do projeto», acima neste arquivo.
 - **R2. Reforço só por erro de predição.** Recompensa bruta não reforça comportamentos que chamam atenção, como `PEDIDO`.
