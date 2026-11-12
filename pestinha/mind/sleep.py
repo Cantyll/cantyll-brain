@@ -11,8 +11,7 @@ consolida a memória episódica e monta a fila de replay (spec, seção 9.4): os
 mais marcantes da memória voltam à rede, um pedaço por quadro, até ele acordar. Ao longo do
 sono, a rede desfaz uma parte do aprendizado (homeostase sináptica, SHY) na medida do sono
 cumprido: uma noite inteira desfaz HOMEOSTASE_SHY, um cochilo desfaz a parte dele. O replay
-para de empurrar cada sinapse perto do seu limite, e uma população que ficou muda tem as
-entradas escaladas para cima (piso por taxa-alvo). A conta é de core/homeostase_sinaptica.py.
+para de empurrar cada sinapse perto do seu limite. A conta é de core/homeostase_sinaptica.py.
 """
 
 from ..log import log
@@ -34,7 +33,7 @@ class SleepController:
         self.relogio = relogio
         self.asleep = False
         self.replay_fila = []       # episódios ainda não reaplicados nesta noite: {sentidos, delta, restante}
-        self.homeostase = HomeostaseDoSono()   # SHY e piso, repartidos pela pressão de sono descarregada
+        self.homeostase = HomeostaseDoSono()   # SHY repartido pela pressão de sono descarregada
 
     def can_sleep(self, body, in_flight, protest_stage, mission):
         """Diz se ele pode dormir agora (no chão, sem ser segurado, sem voar, sem protesto forte e sem missão)."""
@@ -60,7 +59,7 @@ class SleepController:
         prefs = self.memory.consolidate()
         self.replay_fila = [{"sentidos": sentidos, "delta": delta, "restante": ajustes.REPLAY_MS}
                             for sentidos, delta in self.memory.escolher_replay()]
-        self.homeostase.adormecer(self.drives.pressao, [item["sentidos"] for item in self.replay_fila])
+        self.homeostase.adormecer(self.drives.pressao)
         if self.debug():
             log(f"[sono] dormiu ({self.drives.describe()}), replay de {len(self.replay_fila)} episódios")
             for ctx, action, mean, n in prefs:
@@ -69,10 +68,10 @@ class SleepController:
     def replay_passo(self, brain, orcamento_ms, rate):
         """
         Usa até `orcamento_ms` de simulação no replay da noite, um episódio por vez, na ordem da fila. Devolve o tempo usado.
-        Antes, a homeostase do sono faz a parte dela: o SHY do sono cumprido desde a última chamada e, com o
-        replay já terminado, o ensaio do piso (que gasta do mesmo orçamento).
+        Antes, a rede desfaz o SHY do sono cumprido desde a última chamada (não gasta do orçamento).
         """
-        usado = self.homeostase.passo(brain, self.drives.pressao, orcamento_ms, replay_pendente=bool(self.replay_fila))
+        self.homeostase.passo(brain, self.drives.pressao)
+        usado = 0
         while self.replay_fila and usado < orcamento_ms:
             item = self.replay_fila[0]
             n = min(orcamento_ms - usado, item["restante"])

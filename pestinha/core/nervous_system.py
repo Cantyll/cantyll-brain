@@ -45,7 +45,7 @@ import numpy as np
 
 from ..ajustes import AUSENCIA_CORRENTE
 from ..mathutil import valor_real
-from .homeostase_sinaptica import downscaling, escalonamento_piso, saturacao
+from .homeostase_sinaptica import downscaling, saturacao
 from ..store import read_json, write_json
 
 # ============================================================
@@ -306,14 +306,6 @@ TRACE_DECAY = math.exp(-1.0 / 120.0)
 RASTER_BIN_MS = 10             # raster do monitor: uma coluna a cada 10 ms
 RASTER_BINS = 300               # 3 s de história
 
-# Ensaio do piso homeostático (spec, seção 7.3; core/homeostase_sinaptica.py): dormindo, um gêmeo da rede
-# revive padrões sensoriais dos episódios da noite, e a resposta é comparada com a do gêmeo sem nada aprendido.
-ENSAIO_MS = 600                # simulação por padrão, em cada ensaio
-ENSAIO_AQUECE_MS = 200         # começo que não conta (as populações lentas ainda estão subindo)
-ENSAIO_SEMENTE = 1234          # o gêmeo usa sempre o mesmo ruído: a diferença entre dois ensaios vem só das sinapses
-ENSAIO_MIN_HZ = 0.2            # referência abaixo disso: nem recém-nascida a população responde a esses padrões, e fica sem piso
-ENSAIO_MEMORIA = 256           # referências guardadas (uma por padrão diferente)
-
 
 # ============================================================
 # INTERFACE
@@ -345,19 +337,6 @@ class Brain(ABC):
     def taxas(self):
         """{população: taxa de disparo suavizada, em Hz por neurônio}, para todas as populações. Cérebro que não mede devolve {}."""
         return {}
-
-    def ensaio_piso(self, padroes, orcamento_ms):
-        """
-        Piso por taxa-alvo (spec, seção 7.3): avança, em até `orcamento_ms` de simulação, o ensaio que mede a
-        resposta de cada população plástica aos `padroes` (lista de {canal: nível}), sem mexer no estado da
-        rede acordada. Devolve (ms usados, razões). Razões é None enquanto o ensaio não acabou; no fim, é
-        {população: resposta atual / resposta sem nada aprendido}, só com as populações que respondem a esses
-        padrões sem nada aprendido. Cérebro sem plasticidade devolve (0, {}).
-        """
-        return 0, {}
-
-    def escalonar_piso(self, razoes, piso, passo):
-        """Escala para cima, em `passo`, as entradas das populações com razão abaixo de `piso`. Cérebro sem plasticidade ignora."""
 
     @abstractmethod
     def motor_activity(self):
@@ -548,16 +527,6 @@ class LIFBrain(Brain):
                 strength = plastic_rng.lognormal(0.0, 0.25, (a["n"], b["n"])) / np.exp(0.25 ** 2 / 2)
                 self.plastic_masks[(c, post)] = mask * strength
         self.learned = np.zeros((len(self.sensory_names), len(self.plastic_posts)))
-        # peso inato de cada canal para cada população plástica, na mesma unidade de `learned` (para o piso homeostático)
-        self.base_plastica = np.zeros_like(self.learned)
-        for i, c in enumerate(self.sensory_names):
-            a = self.pool(c)
-            for j, post in enumerate(self.plastic_posts):
-                b = self.pool(post)
-                total = self.plastic_masks[(c, post)].sum()
-                if total > 0:
-                    self.base_plastica[i, j] = W[a["start"]:a["start"] + a["n"], b["start"]:b["start"] + b["n"]].sum() / total
-        self._ensaio = None                         # ensaio do piso: criado no primeiro uso (um gêmeo desta rede)
         self.eligibility = np.zeros(len(self.sensory_names))
         self._levels = np.zeros(len(self.sensory_names))
 
@@ -582,7 +551,7 @@ class LIFBrain(Brain):
         self.pool_sizes = np.array([p["n"] for p in self.pools], dtype=float)
         self.pool_counts = np.zeros(len(self.pools))
         self.pool_rate = np.zeros(len(self.pools))
-        self.disparos = np.zeros(len(self.pools))   # pulsos de cada pool desde o começo (o ensaio do piso conta por aqui)
+        self.disparos = np.zeros(len(self.pools))   # pulsos de cada pool desde o começo (para medir uma taxa num intervalo exato)
 
         # ---------------- posições para a UI ----------------
         pos = np.zeros((self.N, 2))
@@ -650,22 +619,6 @@ class LIFBrain(Brain):
     def taxas(self):
         """Taxa atual (Hz por neurônio) de cada população: sensores, interneurônios e motores."""
         return self.pool_rates()
-
-    def ensaio_piso(self, padroes, orcamento_ms):
-        """
-        Avança o ensaio do piso em até `orcamento_ms` de simulação, num gêmeo desta rede (mesma semente e
-        temperamento, ruído fixo). A rede acordada não é tocada: nem a tensão, nem a habituação.
-        Devolve (ms usados, None) enquanto falta, e (ms usados, {população: razão}) quando acaba.
-        """
-        if self._ensaio is None:
-            self._ensaio = _EnsaioPiso(self)
-        return self._ensaio.passo(padroes, self.learned, orcamento_ms)
-
-    def escalonar_piso(self, razoes, piso, passo):
-        """Piso por taxa-alvo: população com razão abaixo de `piso` tem as entradas escaladas para cima em `passo`."""
-        vetor = np.array([float(razoes.get(post, 1.0)) for post in self.plastic_posts])
-        self.learned = escalonamento_piso(self.learned, self.base_plastica, vetor, piso, passo, LEARN_MAX, LEARN_MIN)
-        self._apply_learning()
 
     def stimulate(self, intensities):
         """Recebe a intensidade (0 a 1) de cada canal sensorial e converte em probabilidade de disparo, com habituação."""
@@ -911,91 +864,6 @@ class LIFBrain(Brain):
         except Exception as error:
             log(f"[nervous] estado ilegível ({error}); começando do zero")
             return False
-
-class _EnsaioPiso:
-    """
-    Ensaio do piso homeostático para o LIFBrain. Um gêmeo da rede (mesma semente e temperamento) recebe cada
-    padrão sensorial por ENSAIO_MS, e os pulsos de cada população plástica são contados depois do
-    aquecimento. O gêmeo começa cada padrão do zero e com o mesmo ruído, então duas medidas do mesmo
-    padrão só diferem pelo que as sinapses aprendidas mudam. A referência (nada aprendido) de cada
-    padrão é medida uma vez e guardada.
-    """
-
-    def __init__(self, cerebro):
-        """Cria o gêmeo."""
-        self.gemeo = LIFBrain(seed=cerebro.seed, temperament=cerebro.temperament, seed_ruido=ENSAIO_SEMENTE)
-        g = self.gemeo
-        self.indices = [g._pool_index[post] for post in g.plastic_posts]
-        self.tamanhos = g.pool_sizes[self.indices]
-        self.referencias = {}           # padrão (tupla ordenada) -> pulsos de cada população plástica, sem nada aprendido
-        self.fila = []                  # medidas que faltam: [chave, padrão, é referência?, ms que faltam]
-        self.origem = None              # a lista de padrões do ensaio em curso (lista nova = ensaio novo)
-        self.foto = None                # sinapses aprendidas no começo do ensaio
-        self.pulsos = None              # soma dos pulsos da rede como está, por população plástica
-        self.pulsos_ref = None          # a mesma soma, sem nada aprendido
-        self._no_aquecimento = None
-
-    def _comecar(self, padroes, aprendido):
-        """Monta a fila: para cada padrão, a referência (se ainda não foi medida) e a rede como está agora."""
-        g = self.gemeo
-        if len(self.referencias) > ENSAIO_MEMORIA:
-            self.referencias = {}
-        self.origem = padroes
-        self.foto = np.array(aprendido, copy=True)
-        self.pulsos = np.zeros(len(self.indices))
-        self.pulsos_ref = np.zeros(len(self.indices))
-        self.fila = []
-        for padrao in padroes:
-            limpo = {c: min(1.0, max(0.0, float(v))) for c, v in padrao.items() if c in g.sensory_names}
-            chave = tuple(sorted(limpo.items()))
-            if chave not in self.referencias:
-                self.fila.append([chave, limpo, True, ENSAIO_MS])
-            self.fila.append([chave, limpo, False, ENSAIO_MS])
-
-    def passo(self, padroes, aprendido, orcamento_ms):
-        """Simula até `orcamento_ms` no gêmeo. Devolve (ms usados, razões ou None)."""
-        if not self.fila or padroes is not self.origem:      # outro sono: o ensaio que ficou pela metade não vale
-            self._comecar(padroes, aprendido)
-        g = self.gemeo
-        contando = ENSAIO_MS - ENSAIO_AQUECE_MS          # ms finais que contam
-        usado = 0
-        while self.fila and usado < orcamento_ms:
-            item = self.fila[0]
-            chave, padrao, de_referencia, restante = item
-            if restante == ENSAIO_MS:                    # começo da medida: gêmeo do zero, com estas sinapses
-                g.rng = np.random.default_rng(ENSAIO_SEMENTE)
-                g.v[:] = 0.0
-                g.a[:] = 0.0
-                g.ref[:] = 0
-                g.spikes[:] = 0.0
-                g.pre_gain[:] = 1.0
-                g.pool_counts[:] = 0.0
-                g.learned = np.zeros_like(self.foto) if de_referencia else np.array(self.foto, copy=True)
-                g._apply_learning()
-                g.stimulate(padrao)
-            teto = restante - contando if restante > contando else restante      # não atravessa o fim do aquecimento
-            n = int(min(100, orcamento_ms - usado, teto))
-            g.step(n)
-            usado += n
-            item[3] = restante - n
-            if item[3] == contando:
-                self._no_aquecimento = g.disparos[self.indices].copy()
-            if item[3] <= 0:
-                contados = g.disparos[self.indices] - self._no_aquecimento
-                if de_referencia:
-                    self.referencias[chave] = contados
-                else:
-                    self.pulsos += contados
-                    self.pulsos_ref += self.referencias[chave]
-                self.fila.pop(0)
-        if self.fila:
-            return usado, None
-        segundos = max(1, len(padroes)) * contando / 1000.0
-        hz_ref = self.pulsos_ref / (self.tamanhos * segundos)
-        razoes = {post: float(self.pulsos[j] / self.pulsos_ref[j])
-                  for j, post in enumerate(g.plastic_posts) if hz_ref[j] >= ENSAIO_MIN_HZ}
-        return usado, razoes
-
 
 def criar_cerebro(tipo="lif", seed=None, temperament=None):
     """Escolhe o backend pelo nome (config.CEREBRO). Nesta fase só existe 'lif'; outro nome levanta ValueError."""

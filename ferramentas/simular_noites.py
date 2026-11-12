@@ -2,7 +2,7 @@
 Simula noites de vida do pet, com o código real da rede, da memória e do sono, para ver o que o
 aprendizado faz em semanas: se alguma população morre (PLAYFUL) ou satura (GLOOM).
 
-    python ferramentas/simular_noites.py                      # 30 noites, cenário "duro", com e sem piso
+    python ferramentas/simular_noites.py                      # 30 noites, cenário "duro"
     python ferramentas/simular_noites.py --cenario misto      # outro cenário (veja CENARIOS)
     python ferramentas/simular_noites.py --noites 60 --semente 3 --json saida.json
     python ferramentas/simular_noites.py --pulsos             # o replay simula os pulsos (mais lento, mesmas sinapses)
@@ -10,7 +10,7 @@ aprendizado faz em semanas: se alguma população morre (PLAYFUL) ou satura (GLO
 É critério de aceitação de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase
 (tests/test_simulacao_noites.py roda uma versão dela). Com a mesma semente, o resultado se repete.
 
-O que é real: LIFBrain (aprendizado, replay, SHY, piso), EpisodicMemory (episódios em arquivo, escolha
+O que é real: LIFBrain (aprendizado, replay, SHY), EpisodicMemory (episódios em arquivo, escolha
 do replay), SleepController (a noite inteira, quadro a quadro) e os números de ajustes.py e do perfil.
 
 O que é suposição, e não medida de uso real:
@@ -22,8 +22,8 @@ O que é suposição, e não medida de uso real:
   depende só dos níveis sensoriais e de δ, então as sinapses saem idênticas (há um teste disso), e a
   simulação fica várias vezes mais rápida. Quando o aprendizado depender dos pulsos (STDP), use --pulsos.
 - A noite: ele adormece com pressão de sono PRESSAO_AO_DORMIR e acorda em LIMIAR_ACORDA_PRESSAO. A
-  pressão só anda quando não há replay nem ensaio para simular, como numa noite de verdade, em que uma
-  hora de sono é muito mais longa que os segundos de replay.
+  pressão só anda quando não há replay para simular, como numa noite de verdade, em que uma hora de
+  sono é muito mais longa que os segundos de replay.
 
 Como ler a saída: "uso" é a taxa média da população nos contextos do cenário, medida de manhã num
 gêmeo da rede com ruído fixo. A coluna % compara com o dia 0 (nada aprendido). "peso GLOOM" é a maior
@@ -182,7 +182,7 @@ def simular_dia(brain, memoria, rng, cenario, perfil):
 def simular_noite(brain, sono, perfil, pressao_ao_dormir=PRESSAO_AO_DORMIR, pressao_ao_acordar=None):
     """
     Uma noite pelo SleepController real: adormece, e a cada quadro o sono tem 100 ms de simulação para
-    replay, SHY e piso. A pressão cai um pouco só nos quadros em que não havia nada para simular.
+    replay, e o SHY acompanha a pressão. A pressão cai um pouco só nos quadros em que não havia nada para simular.
     """
     fim = ajustes.LIMIAR_ACORDA_PRESSAO if pressao_ao_acordar is None else pressao_ao_acordar
     degrau = (pressao_ao_dormir - fim) / (4.0 * ajustes.HOMEOSTASE_AJUSTES_NOITE)
@@ -222,20 +222,19 @@ def medir(brain):
     return uso, por_contexto
 
 
-def simular(cenario="duro", noites=30, semente=7, piso=None, dias=None, pasta=None, pulsos=False):
+def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, **trocas):
     """
-    Roda `noites` dias e noites. piso: None usa ajustes.HOMEOSTASE_PISO; 0 desliga o piso.
-    dias: em quais manhãs medir (padrão DIAS_PADRAO; o dia 0 e o último entram sempre).
+    Roda `noites` dias e noites. dias: em quais manhãs medir (padrão DIAS_PADRAO; o dia 0 e o último entram sempre).
     pulsos: True simula os pulsos no replay, como o app (mais lento, mesmas sinapses no LIFBrain).
+    trocas: valores de ajustes.py só para esta simulação (por exemplo HOMEOSTASE_SHY=0.0, para comparar).
     Devolve uma lista de linhas (dict), uma por manhã medida. A última traz também "aprendido".
     """
     regras = CENARIOS[cenario] if isinstance(cenario, str) else cenario
     perfil = config.PROFILES[regras["perfil"]]
     dias = set(DIAS_PADRAO if dias is None else dias) | {0, noites}
-    piso = ajustes.HOMEOSTASE_PISO if piso is None else piso
     linhas = []
     with contextlib.ExitStack() as pilha:
-        pilha.enter_context(_ajustes_trocados(HOMEOSTASE_PISO=piso))
+        pilha.enter_context(_ajustes_trocados(**trocas))
         pilha.enter_context(_memoria_calada())
         if pasta is None:
             pasta = pilha.enter_context(tempfile.TemporaryDirectory())
@@ -257,8 +256,6 @@ def simular(cenario="duro", noites=30, semente=7, piso=None, dias=None, pasta=No
                     "por_contexto": por_contexto,
                     "peso_gloom_max": float(brain.learned[:, j["GLOOM"]].max() / ns.LEARN_MAX),
                     "peso_playful_min": float(brain.learned[:, j["PLAYFUL"]].min() / -ns.LEARN_MIN),
-                    "razoes_piso": dict(sono.homeostase.razoes),
-                    "ajustes_piso": sono.homeostase.ajustes_piso,
                 })
             if dia == noites:
                 linhas[-1]["aprendido"] = brain.learned.tolist()
@@ -275,25 +272,23 @@ def _porcento(valor):
 def imprimir(titulo, linhas):
     """Tabela de uma simulação."""
     print(titulo)
-    print("  dia | PLAYFUL uso      | CALM uso         | GLOOM uso | SAD uso | peso GLOOM | peso PLAYFUL | piso: razão PLAYFUL, ajustes")
+    print("  dia | PLAYFUL uso      | CALM uso         | GLOOM uso | SAD uso | peso GLOOM | peso PLAYFUL")
     for linha in linhas:
         uso, rel = linha["uso_hz"], linha["uso_relativo"]
-        razao = linha["razoes_piso"].get("PLAYFUL")
         print(f"  {linha['dia']:3d} | {uso['PLAYFUL']:5.2f} Hz {_porcento(rel['PLAYFUL'])}   | "
               f"{uso['CALM']:5.2f} Hz {_porcento(rel['CALM'])}   | {uso['GLOOM']:6.2f} Hz | {uso['SAD']:5.2f}Hz | "
-              f"{100 * linha['peso_gloom_max']:5.0f}% lim | {-100 * linha['peso_playful_min']:6.0f}% lim  | "
-              f"{'  --' if razao is None else f'{razao:4.2f}'}, {linha['ajustes_piso']}")
+              f"{100 * linha['peso_gloom_max']:5.0f}% lim | {-100 * linha['peso_playful_min']:6.0f}% lim")
     print()
 
 
 def main():
     for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ.setdefault(var, "1")
-    parser = argparse.ArgumentParser(description="Simula noites de vida do pet (replay, SHY e piso).")
+    parser = argparse.ArgumentParser(description="Simula noites de vida do pet (replay e SHY).")
     parser.add_argument("--cenario", default="duro", choices=sorted(CENARIOS))
     parser.add_argument("--noites", type=int, default=30)
     parser.add_argument("--semente", type=int, default=7)
-    parser.add_argument("--so", choices=("com", "sem"), help="roda só com o piso de ajustes.py, ou só sem piso")
+    parser.add_argument("--sem-shy", action="store_true", help="roda também sem o SHY (HOMEOSTASE_SHY = 0), para comparar")
     parser.add_argument("--pulsos", action="store_true", help="simula os pulsos no replay, como o app (mais lento)")
     parser.add_argument("--json", help="grava as linhas neste arquivo")
     args = parser.parse_args()
@@ -301,13 +296,11 @@ def main():
     regras = CENARIOS[args.cenario]
     print(f"Cenário {args.cenario}: {regras['descricao']}. Perfil {regras['perfil']}, semente {args.semente}, "
           f"{args.noites} noites.\n")
-    saida = {}
-    if args.so != "sem":
-        saida["com_piso"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos)
-        imprimir(f"Com piso (HOMEOSTASE_PISO = {ajustes.HOMEOSTASE_PISO})", saida["com_piso"])
-    if args.so != "com":
-        saida["sem_piso"] = simular(args.cenario, args.noites, args.semente, piso=0.0, pulsos=args.pulsos)
-        imprimir("Sem piso (HOMEOSTASE_PISO = 0)", saida["sem_piso"])
+    saida = {"com_shy": simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos)}
+    imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}", saida["com_shy"])
+    if args.sem_shy:
+        saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, HOMEOSTASE_SHY=0.0)
+        imprimir("Sem SHY (HOMEOSTASE_SHY = 0)", saida["sem_shy"])
     if args.json:
         Path(args.json).write_text(json.dumps(saida, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"Linhas gravadas em {args.json}")
