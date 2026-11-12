@@ -334,6 +334,10 @@ class Brain(ABC):
     def downscaling_sono(self, fracao):
         """Homeostase sináptica (SHY): o sono desfaz uma fração das sinapses aprendidas. Cérebro sem plasticidade ignora."""
 
+    def taxas(self):
+        """{população: taxa de disparo suavizada, em Hz por neurônio}, para todas as populações. Cérebro que não mede devolve {}."""
+        return {}
+
     @abstractmethod
     def motor_activity(self):
         """{motor: taxa de disparo suavizada, em Hz por neurônio}"""
@@ -547,6 +551,7 @@ class LIFBrain(Brain):
         self.pool_sizes = np.array([p["n"] for p in self.pools], dtype=float)
         self.pool_counts = np.zeros(len(self.pools))
         self.pool_rate = np.zeros(len(self.pools))
+        self.disparos = np.zeros(len(self.pools))   # pulsos de cada pool desde o começo (para medir uma taxa num intervalo exato)
 
         # ---------------- posições para a UI ----------------
         pos = np.zeros((self.N, 2))
@@ -610,6 +615,10 @@ class LIFBrain(Brain):
         """Homeostase sináptica (SHY, decisão D4): o sono desfaz `fracao` de todas as sinapses aprendidas."""
         self.learned = downscaling(self.learned, fracao)
         self._apply_learning()
+
+    def taxas(self):
+        """Taxa atual (Hz por neurônio) de cada população: sensores, interneurônios e motores."""
+        return self.pool_rates()
 
     def stimulate(self, intensities):
         """Recebe a intensidade (0 a 1) de cada canal sensorial e converte em probabilidade de disparo, com habituação."""
@@ -675,6 +684,7 @@ class LIFBrain(Brain):
         rate = self.pool_counts / (dt_s * self.pool_sizes)
         alpha = 1.0 - math.exp(-dt_s / READ_TAU)
         self.pool_rate += alpha * (rate - self.pool_rate)
+        self.disparos += self.pool_counts
         self.pool_counts[:] = 0.0
         self.time_ms += n
 
