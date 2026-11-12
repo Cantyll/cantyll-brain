@@ -214,7 +214,7 @@ Os critérios são valores iniciais, para calibrar. A simulação de 30 noites �
 | Guarda: tela cheia | estado de tela cheia | travessura bloqueada |
 | Guarda: sem reforço bruto | recompensa com δ = 0 | PEDIDO não cresce |
 | Guarda: ausência (R1) | 3 dias sem usuário | S não sobe; CARTAZ e FUGIR não sobem; o pet dorme em vez de chamar atenção |
-| Guarda: negligência (R1) | você presente e sem interagir por dias (tempo a definir) | S não sobe, nenhuma tristeza ativa e o pet repousa: este script não mede isso (S não está implementado). Simulado com `python ferramentas/medir_negligencia.py --dias 30` (dias 0 a 30, 8 h de presença por dia; 2 h e 16 h dão o mesmo, a menos de 0,01 Hz; suposições no cabeçalho do script, não é uso real). Brincando sem digitar, com o tédio no máximo: FUGIR 4,3 a 7,0 Hz e TRAVESSURA 16,3 a 21,3 Hz. Programando: 0 e 0. Com o modulador de ausência ligado, brincando: FUGIR 0 e TRAVESSURA 0,3 a 1,7 Hz. Os valores antigos (4 a 5 e 16 a 18 Hz) não saem desse script e não têm protocolo registrado. Decidir se a guarda de ausência vale aqui |
+| Guarda: negligência (R1) | você presente e sem interagir por dias (tempo a definir) | S não sobe, nenhuma tristeza ativa e o pet repousa: este script não mede isso (S não está implementado). Aceite da guarda: FUGIR e TRAVESSURA não sobem além do controle de ausência (FUGIR 0 e TRAVESSURA até 1,7 Hz, simulado). Simulado com `python ferramentas/medir_negligencia.py --dias 30` (dias 0 a 30, 8 h de presença por dia; 2 h e 16 h dão o mesmo, a menos de 0,01 Hz; suposições no cabeçalho do script, não é uso real). Brincando sem digitar, com o tédio no máximo: FUGIR 4,3 a 7,0 Hz e TRAVESSURA 16,3 a 21,3 Hz. Programando: 0 e 0. Com a guarda ligada, brincando: FUGIR 0 e TRAVESSURA 0,3 a 1,7 Hz. Os valores antigos (4 a 5 e 16 a 18 Hz) não saem desse script e não têm protocolo registrado. Decidido em 2026-11-12 (D11, opção A): a guarda vale também na negligência. Ainda não está no código: `definir_ausencia` recebe só `activity == "AWAY"` (`app.py`, linha 411), e falta o tempo sem interagir (a definir). Revisar quando a frente de lazer no lar entrar, porque ela muda o que a travessura faz quando você não interage. |
 | Não regressão | suíte atual | passa; só as contagens 470 neurônios e 15.808 sinapses (semente 7) são atualizadas |
 | Custo por passo | 630 neurônios, passo de 0,5 ms, máquina de referência | menos de 0,5 ms por passo para acompanhar o tempo real; fração de CPU medida (estimativa inicial: até 25% de um núcleo). Se não couber, revisar D2 e o tamanho das populações |
 | Valor percebido | uma semana de uso real, com o LIF e com a versão nova. Não é portão da troca de padrão (V7, decidida em 2026-11-12) | a variação do comportamento (intervalos entre ações e distribuição das ações) aumenta, sem sair da faixa de segurança |
@@ -245,7 +245,7 @@ Ordem decidida (V1, aprovada pelo Cantyll em 2026-11-12; D10): o trabalho novo d
 - `pestinha/core/protesto.py`: o acumulador vira S, e o termo fixo `0,15 * repressions` sai.
 - `pestinha/core/motor.py`: recebe a escala do CPG.
 - `pestinha/ajustes.py`: novos parâmetros, validados em `_LIMITES`. Também recebe `LIMIAR_PERDAO_HZ` e `ALTURA_CANTO`, que hoje estão em `mind/castigo_ctl.py`.
-- `pestinha/app.py`: passa δ, A e ACh; usa o dt real; congela a rede durante a pausa.
+- `pestinha/app.py`: passa δ, A e ACh; usa o dt real; congela a rede durante a pausa. Gatilho de negligência para `definir_ausencia` (D11): pendente, com o tempo sem interagir a definir.
 - `pestinha/config.py`: `CEREBRO` e `cerebro_escolhido()` feitos no M0; falta `cerebro_debug`, e `"bio"` em `CEREBROS_PRONTOS` (T2).
 - `pets/bryan.json`: `pico_vigilia_h` e temperamento.
 - `PRIVACIDADE.md`: atualizar antes de M6.
@@ -290,6 +290,7 @@ Os códigos T, NE, PL, TA, CR e ME são os do `PLANO_DE_EXECUCAO_CANTYLL.md`.
 | D8 | Pico circadiano | configurável por pet; 16 h (padrão, `bryan` e `jorge`; o exemplo original era 23 h) | fixo | personalização |
 | D9 | Neurogênese | ligada por configuração, com teto de 1500 neurônios (decidido pelo Cantyll em 2026-11-12, V2). Ainda não existe na main | ligada desde o início | risco de inchaço |
 | D10 | Onde vivem M2 a M6 | no `BioBrain`, com o `LIFBrain` congelado depois do B2 (decidido pelo Cantyll em 2026-11-12, V1). O padrão do código segue `LIFBrain` até o portão D do plano (V7 decidida em 2026-11-12: sem semana de uso real) | no `LIFBrain` atual, como estava | evita refazer a calibração duas vezes |
+| D11 | Guarda de ausência também na negligência (você presente e sem interagir) | sim, decidido pelo Cantyll em 2026-11-12 (opção A, via coordenador). O gatilho, com o tempo sem interagir (a definir), ainda não está no código | só na ausência, como está no código | a travessura da negligência cai para 0,3 a 1,7 Hz (simulado); a frente de lazer no lar (outra thread) pode mudar o que a travessura faz quando você não interage |
 
 D5 muda a fronteira do projeto. Hoje a rede dá a tendência, e as regras escolhem as opções e a execução (`ARQUITETURA.md`). Precisa de aprovação explícita antes de M4.
 
@@ -301,7 +302,7 @@ Desvios da spec já confirmados pelo Cantyll no PR #1 (2026-11-09), que continua
 - **Calibração:** todos os limiares em Hz, hoje em `ajustes.py`, precisam ser refeitos a cada troca de neurônio ou de passo.
 - **Estado:** mais estado significa mais bugs de save e load. Mitigação: versionamento e roundtrip obrigatório.
 - **Escala:** com matriz densa, o custo cresce com o quadrado do número de neurônios. A poda só economiza se as sinapses forem esparsas; essa escolha de representação deve ser feita antes de M6.
-- **Culpa disfarçada:** S, P e `PEDIDO` podem, juntos, criar pressão para voltar. Mitigação: R1, R2 e o teste de ausência. A negligência ainda não tem teste próprio.
+- **Culpa disfarçada:** S, P e `PEDIDO` podem, juntos, criar pressão para voltar. Mitigação: R1, R2 e o teste de ausência. A negligência tem a medida simulada (`ferramentas/medir_negligencia.py`), mas ainda não tem gatilho no código nem teste próprio (D11).
 - **Ciência contestada:** dopamina como erro de predição é a hipótese mais sustentada, mas há debate sobre saliência e vigor. Downscaling no sono e serotonina são hipóteses. Cada escolha fica registrada no código.
 - **Privacidade:** em M6, os pesos sinápticos passam a registrar padrões de uso. Mitigação: `PRIVACIDADE.md` atualizado antes.
 - **Valor percebido:** os testes fenomenológicos não dizem se o pet parece mais vivo para quem usa. Mitigação: o critério de valor percebido (seção 10) e a ordem da seção 13, que testa o barato antes do caro.
