@@ -86,7 +86,7 @@ As decisões de comportamento saem dos motores de decisão da rede (tabela em
 - sono pela pressão de sono e pelo relógio (`core/ritmo.py`, `mind/sleep.py`); a energia continua como drive, mas não manda no sono;
 - qual travessura fazer (memória episódica com bandit contextual).
 
-**Pendente (decisão D5, spec seção 14):** os gânglios da base podem passar a liberar as ações, no lugar das regras de limiar e sorteio. As guardas continuam fora da rede em qualquer caso. Até a decisão, vale o que está escrito acima.
+**Pendente (decisão D5, adiada pelo Cantyll para depois do PL-1 estar na `main`; spec seção 14):** os gânglios da base podem passar a liberar as ações, no lugar das regras de limiar e sorteio. As guardas continuam fora da rede em qualquer caso. Até a decisão, vale o que está escrito acima.
 
 ## Aprendizado
 
@@ -161,7 +161,7 @@ Cópia da seção 1 da [especificação do núcleo biológico](ESPECIFICACAO_NUC
 - **R3. Crescimento não é disparado por recompensa bruta.** Vale para sinaptogênese e neurogênese.
 - **R4. Segurança fica fora da rede.** Tela cheia, usuário ausente e limites de execução continuam em código de regras (guardas), que podem vetar qualquer ação da rede.
 - **R5. Biologia como fonte de fenômenos testáveis, não como cópia.** Cada parte tem nome biológico, função e teste.
-- **R6. Privacidade.** A rede recebe as mesmas categorias que `sense/senses.py` já produz. O estado salvo tem contagens e pesos, nunca títulos ou conteúdo. Base: `PRIVACIDADE.md`.
+- **R6. Privacidade.** A rede recebe as mesmas categorias que `sense/senses.py` já produz. O estado salvo tem contagens e pesos, nunca títulos ou conteúdo. A gravação dos sentidos para gêmeos de ablação (V6) é outro arquivo: exige permissão própria e fica desligada por padrão. Base: `PRIVACIDADE.md`.
 - **R7. Mudança por fase, reversível.** Cada fase é ligada por configuração. O LIF continua disponível até o novo núcleo passar nos testes.
 
 ## Como a decisão funciona
