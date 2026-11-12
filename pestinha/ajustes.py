@@ -40,6 +40,9 @@ RECOMPENSA_CARINHO = 1.0        # recompensa por segundo de carinho (aprendizado
 PUNICAO_DISPENSA = -0.6         # recompensa negativa depois de dispensar
 DISPENSA_RAPIDA = 3.0           # s: fechou tão rápido assim = dispensa "na cara"
 PENALIDADE_DISPENSA = 1.0       # s em que a dispensa pesa no aprendizado
+HABITUACAO_DISPENSA = 10.0      # dispensas seguidas para o peso no aprendizado cair à metade (0 desliga; core/habituacao.py)
+RECUPERACAO_DISPENSA_H = 8.0    # h: constante de tempo em que a habituação à dispensa passa
+DESABITUACAO_CARINHO = 1.0      # fração da habituação à dispensa que um carinho desfaz (0 = nenhuma, 1 = toda)
 
 # ---------------------------------------------------------------------------
 # Física do corpo (núcleo)
@@ -154,7 +157,7 @@ AUSENCIA_CORRENTE = 0.2         # corrente inibitória por ms em FUGIR e TRAVESS
 # ---------------------------------------------------------------------------
 # Replay noturno (M3): reaplica os episódios durante o sono (spec, seção 9.4)
 # ---------------------------------------------------------------------------
-REPLAY_EPISODIOS = 50           # episódios reaplicados por sono, por |δ| e recência
+REPLAY_EPISODIOS = 50           # episódios reaplicados num sono de uma noite de dívida, por |δ| e recência (dívida menor: a parte dela)
 REPLAY_FATOR = 0.5              # δ_replay = REPLAY_FATOR · δ registrado (spec, seção 9.4)
 REPLAY_MS = 500                 # cada episódio reativa o padrão sensorial por 0,5 s
 REPLAY_MS_POR_FRAME = 100       # simulação de replay por quadro, para a tela não travar
@@ -163,7 +166,7 @@ REPLAY_MS_POR_FRAME = 100       # simulação de replay por quadro, para a tela 
 # Homeostase sináptica no sono (decisão D4, hipótese SHY; spec, seção 9.4)
 # Sem isso, o replay de episódios negativos levava a tristeza (GLOOM) ao teto e ela ficava lá.
 # ---------------------------------------------------------------------------
-HOMEOSTASE_SHY = 0.2            # cada sono desfaz essa fração das sinapses aprendidas (downscaling, uma vez por sono)
+HOMEOSTASE_SHY = 0.2            # um sono de uma noite de dívida desfaz essa fração das sinapses aprendidas (dívida menor: 1 − 0,8^fração)
 HOMEOSTASE_TETO = 0.5           # o replay para de empurrar uma sinapse em 50% do seu limite (LEARN_MAX / LEARN_MIN)
 
 # ---------------------------------------------------------------------------
@@ -203,6 +206,9 @@ _LIMITES = {
     "PUNICAO_DISPENSA": (float, -10.0, 0.0),
     "DISPENSA_RAPIDA": (float, 0.0, 60.0),
     "PENALIDADE_DISPENSA": (float, 0.0, 60.0),
+    "HABITUACAO_DISPENSA": (float, 0.0, 1000.0),
+    "RECUPERACAO_DISPENSA_H": (float, 0.01, 168.0),
+    "DESABITUACAO_CARINHO": (float, 0.0, 1.0),
     "GRAVIDADE": (float, 0.0, 100000.0),
     "QUICA": (float, 0.0, 1.0),
     "ATRITO_CHAO": (float, 0.0, 100.0),

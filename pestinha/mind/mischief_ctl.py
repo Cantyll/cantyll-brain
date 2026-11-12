@@ -4,7 +4,8 @@ MISCHIEF CONTROLLER - quando e como ele apronta, e o que a dispensa causa.
 As regras dizem o que PODE (permissões, tela cheia, limite de objetos, assets,
 triste e dormindo não aprontam). A memória episódica escolhe o que FAZER,
 pelo que deu certo antes naquele contexto. A dispensa alimenta a rede (raiva),
-a memória (episódio negativo) e o aprendizado (penalidade de 1 s).
+a memória (episódio negativo) e o aprendizado (penalidade de 1 s). Dispensas repetidas no
+mesmo dia pesam cada vez menos no aprendizado (core/habituacao.py); a raiva e a memória, não.
 """
 
 from ..log import log
@@ -13,7 +14,9 @@ from collections import deque
 
 VALIDADE_PEDIDO_S = 10.0    # s: "fazer uma travessura agora" vale por este tempo
 
+from .. import ajustes
 from ..core.emotion import PRIORITY
+from ..core.habituacao import Habituacao
 from ..ajustes import (DISPENSA_RAPIDA as QUICK_DISMISS, PENALIDADE_DISPENSA as PENALTY_SECONDS,
                        GANHO_TRAVESSURA)
 
@@ -33,6 +36,9 @@ class MischiefController:
         self.dismiss_times = deque()
         self.postit_weight = 0.5     # quanto o pet gosta de colar post-its (ligado pelo app)
         self.penalty_until = 0.0
+        self.peso_penalidade = 1.0      # quanto a penalidade em vigor pesa (a habituação diminui)
+        self.habituacao = Habituacao(ajustes.HABITUACAO_DISPENSA, ajustes.RECUPERACAO_DISPENSA_H * 3600.0)
+        self._acariciando = False
         self.pedido_forcado = False     # "fazer uma travessura agora": ignora o sorteio uma vez
         self.forcado_ate = 0.0
 
@@ -103,6 +109,7 @@ class MischiefController:
         self.drives.touched("dismiss")
         self.memory.on_dismiss(thing, elapsed, prof["dismiss_patience"])
         self.penalty_until = now + PENALTY_SECONDS
+        self.peso_penalidade = self.habituacao.registrar(now)
         self.dismiss_times.append(now)
         while self.dismiss_times and now - self.dismiss_times[0] > prof["drama_window"]:
             self.dismiss_times.popleft()
@@ -110,6 +117,12 @@ class MischiefController:
         if len(self.dismiss_times) >= prof["drama_count"] or (quick and len(self.dismiss_times) >= 2):
             self.emotion.force("dramatico", 4.0, now, PRIORITY["dramatico"])
             self.dismiss_times.clear()
+
+    def ao_carinho(self, acariciando):
+        """Chamar a cada quadro. No começo de cada carinho, a habituação à dispensa diminui (desabituação)."""
+        if acariciando and not self._acariciando:
+            self.habituacao.desabituar(ajustes.DESABITUACAO_CARINHO)
+        self._acariciando = bool(acariciando)
 
     def clear(self):
         """Tira todas as travessuras da tela e solta o que ele estava carregando."""
