@@ -160,11 +160,18 @@ REPLAY_MS = 500                 # cada episódio reativa o padrão sensorial por
 REPLAY_MS_POR_FRAME = 100       # simulação de replay por quadro, para a tela não travar
 
 # ---------------------------------------------------------------------------
-# Homeostase sináptica no sono (decisão D4, hipótese SHY; spec, seção 9.4)
+# Homeostase sináptica no sono (decisão D4, hipótese SHY; spec, seções 7.3 e 9.4)
 # Sem isso, o replay de episódios negativos levava a tristeza (GLOOM) ao teto e ela ficava lá.
 # ---------------------------------------------------------------------------
-HOMEOSTASE_SHY = 0.2            # cada sono desfaz essa fração das sinapses aprendidas (downscaling, uma vez por sono)
+HOMEOSTASE_SHY = 0.2            # uma noite inteira de sono desfaz essa fração das sinapses aprendidas; um cochilo desfaz a parte dele (pela pressão de sono descarregada)
 HOMEOSTASE_TETO = 0.5           # o replay para de empurrar uma sinapse em 50% do seu limite (LEARN_MAX / LEARN_MIN)
+HOMEOSTASE_AJUSTES_NOITE = 10   # parcelas de uma noite inteira: a cada uma, o SHY daquela parcela e um ajuste do piso
+# Piso por taxa-alvo (spec, seção 7.3): nenhuma população plástica (PLAYFUL, CALM, FRUSTRATION, GLOOM) fica muda.
+# Dormindo, a rede ensaia a resposta de cada uma aos padrões sensoriais dos episódios do replay e compara com a
+# da mesma rede sem nada aprendido. Abaixo do piso, as entradas da população são escaladas para cima.
+HOMEOSTASE_PISO = 0.5           # fração da resposta de referência abaixo da qual o piso age (0 = desligado: aceita o colapso)
+HOMEOSTASE_PISO_PASSO = 0.05    # cada ajuste escala as entradas em 5% (spec, seção 7.3)
+HOMEOSTASE_PISO_PADROES = 10    # quantos padrões do replay entram em cada ensaio
 
 # ---------------------------------------------------------------------------
 # Validação
@@ -254,6 +261,12 @@ _LIMITES = {
     "LADO_JANELA_PET": (int, 100, 1000),
     "ZZZ_QUANTIDADE": (int, 0, 20),
     "ZZZ_PERIODO": (float, 0.1, 60.0),
+    "HOMEOSTASE_SHY": (float, 0.0, 0.99),
+    "HOMEOSTASE_TETO": (float, 0.01, 1.0),
+    "HOMEOSTASE_AJUSTES_NOITE": (int, 1, 100),
+    "HOMEOSTASE_PISO": (float, 0.0, 1.0),
+    "HOMEOSTASE_PISO_PASSO": (float, 0.0, 1.0),
+    "HOMEOSTASE_PISO_PADROES": (int, 1, 50),
 }
 
 
