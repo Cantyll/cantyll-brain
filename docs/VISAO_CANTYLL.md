@@ -328,7 +328,7 @@ que não se formam nesta escala) são registrados como resultado.
 | D9, neurogênese | Desligada, teto de 800 | Ligada, com teto de 1500 neurônios | Decidido pelo Cantyll (V2, 2026-11-12) |
 | Seção 13, ordem das fases | M0, M3, M2, M5, M6 no LIF; M1 por último | M0 e M3 no LIF (PR #5); depois paridade do `BioBrain`, M1 por população, e M2, M5, M6 nele | Consequência da D10 |
 | Seções 9.5 e 16, CA3 e giro denteado | Fora de escopo | Hipocampo rápido entra (seção 6): episódios gerais (ME-1) e lembrança por pista parcial, tipo CA3 (ME-3). Giro denteado continua fora | Consequência da decisão de memória |
-| D5, gânglios da base liberam ação | Pendente | Continua pendente. O workspace não substitui essa decisão | Sem mudança |
+| D5, gânglios da base liberam ação | Pendente | Adiada: só é decidida depois que o PL-1 estiver na `main`. O workspace não substitui essa decisão | Decidido pelo Cantyll (2026-11-12) |
 | Seção 10, valor percebido | Critério medido em uma semana de uso real com cada cérebro | Continua como medida, mas não segura a troca do padrão para o `BioBrain`. A comparação fica para depois da troca, pela fotografia diária | Decidido pelo Cantyll (V7, 2026-11-12) |
 | Seção 7.3, escalonamento homeostático | Especificado | Não entra. O piso por taxa-alvo foi cancelado; a premissa que o tornava urgente (PLAYFUL a zero) não se reproduziu | Decidido pelo Cantyll (2026-11-12) |
 
@@ -337,7 +337,8 @@ A spec só é editada por um PR próprio, depois do merge do PR #5, para não co
 ## 11. Decisões do Cantyll
 
 As sete decisões foram tomadas pelo Cantyll em 2026-11-12. A coluna "Era" guarda a opção que não foi
-escolhida. Da spec, continua pendente só a D5 (gânglios da base liberam ação).
+escolhida. Da spec, fica adiada só a D5 (gânglios da base liberam ação): o
+Cantyll decide depois que o PL-1 estiver na `main`.
 
 | ID | Decisão | Decidido | Era |
 |---|---|---|---|

@@ -252,7 +252,8 @@ Só contagens, taxas e pesos. Nenhum nome de programa, título ou texto (R6).
 
 ## 9. Fora deste plano
 
-- Gânglios da base liberando ação (spec, M4): a decisão D5 continua pendente.
+- Gânglios da base liberando ação (spec, M4): o Cantyll adiou a D5 em 2026-11-12. Ela só é decidida depois
+  que o PL-1 estiver na `main`. Até lá, nenhum PR deste plano depende dela.
 - Microfone: a V4 ficou em só texto escrito, e o microfone ficou em aberto para depois.
 - Nível de som do sistema: a V5 ficou em fora por enquanto. Voz sintetizada e sons seguem fora.
 - A medida do "valor percebido" da spec (uma semana de uso real com cada cérebro): a V7 tirou ela do caminho
