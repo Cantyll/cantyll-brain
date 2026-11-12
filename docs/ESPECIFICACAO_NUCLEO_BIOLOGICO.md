@@ -103,7 +103,7 @@ Cada `Projecao` tem: populações de origem e destino, lista de sinapses (índic
 ### 7.3 Escalonamento homeostático
 Cada população teria uma taxa-alvo r*, em Hz por neurônio. A cada hora acordado, e também durante o sono, os pesos de entrada seriam escalados em até ±5% por ajuste. **Esta seção não é implementável como está escrita, e será reescrita depois do B2:** (a) r* seria a taxa medida na fase M1, mas o B2 roda antes do M1, no LIF, então o B2 tem de definir de onde sai r*; (b) o texto não diz se o ajuste escala `learned` (30 canais × 4 populações, a única parte plástica do LIF), `W_base` ou outra coisa, nem o que significa ±5%.
 
-**Prioridade (visão, seção 10):** é o piso que falta para a brincadeira (PLAYFUL) não cair a zero. Hoje ela cai a zero em 10 a 20 noites simuladas, com ou sem a homeostase atual (problema aberto, registrado no CHANGELOG; a simulação ainda não está no repositório). **Pendente do B2 do plano:** o piso por taxa-alvo ainda não está no código. Esta seção não está implementada; na main há só o downscaling do sono e o teto do replay (seção 9.4).
+**Prioridade (visão, seção 10):** é o piso que falta para a brincadeira (PLAYFUL) não cair a zero. A queda a zero está registrada como problema aberto no CHANGELOG, a partir de uma simulação que está em revisão (seção 9.4). **Pendente do B2 do plano:** o piso por taxa-alvo ainda não está no código. Esta seção não está implementada; na main há só o downscaling do sono e o teto do replay (seção 9.4).
 
 ### 7.4 Acetilcolina
 Taxa de aprendizado efetiva: η_eff = η · (0,5 + ACh).
@@ -173,7 +173,7 @@ Durante o sono, `episodic.escolher_replay()` escolhe até 50 episódios (`REPLAY
 
 Downscaling sináptico no sono (hipótese SHY) está ligado (decisão D4, Cantyll, 2026-11-11) e na main desde o PR #5. Cada vez que ele adormece, antes do replay, cada sinapse aprendida perde 20% (`HOMEOSTASE_SHY`; função `downscaling` em `core/homeostase_sinaptica.py`). É por adormecer, não por noite: acordar e voltar a dormir na mesma noite desfaz mais 20% (`test_downscaling_do_sono_acontece_uma_vez_por_sono`). Durante o replay, o empurrão no mesmo sentido perde força de forma linear à medida que a sinapse se aproxima de 50% do seu limite (`HOMEOSTASE_TETO`; função `saturacao`): perde metade da força a 25% do limite e zera em 50%. Os limites são assimétricos (LEARN_MAX = 0,08 e LEARN_MIN = −0,05), então o empurrão para em +0,04 e em −0,025. Puxar de volta para zero não é freado. Sem isso, a tristeza de episódios negativos subia ao teto e ficava lá. A simulação de 30 noites, que ainda não está no repositório, precisa contar cada sono, e não cada noite.
 
-Os números dessa história (4,8 Hz em 30 noites sem a homeostase; 0,2 a 1 Hz com ela, nos dias 10 a 30) vêm de uma simulação que ainda não está no repositório. Até o B2 criar `ferramentas/simular_noites.py`, são resultados simulados, não medidos.
+Os números dessa história (4,8 Hz em 30 noites sem a homeostase; 0,2 a 1 Hz com ela, nos dias 10 a 30) vêm de uma simulação que ainda não está no repositório e está em revisão: ela usou a taxa de aprendizado de teste (0,004, `LEARN_RATE_PADRAO`), e a correção ainda não foi conferida no repositório. Até o B2 criar `ferramentas/simular_noites.py` e publicar a simulação, são resultados simulados, não medidos, e não servem de critério.
 
 ### 9.5 Opcional, fora do escopo
 - Modelo direto cerebelar (previsão do efeito do próprio movimento).
@@ -203,7 +203,7 @@ Os critérios são valores iniciais, para calibrar. A simulação de 30 noites �
 | Retenção (M6) | aprende um padrão; faz 5 aprendizados novos; testa o primeiro | ≥ 80% de reprodução |
 | Sinaptogênese e poda (M6, pendente, CR-1) | limite de grau e custo do passo | grau no máximo o dobro do inicial; custo dentro do orçamento; sinapse nova só com δ médio positivo (R3) |
 | Neurogênese (M7, pendente da V2 e do CR-2) | neurônios novos com maturação | neurônio novo sobrevive só se for recrutado; teto respeitado |
-| Piso por taxa-alvo e simulação de 30 noites (pendente, B2) | `ferramentas/simular_noites.py`, com semente fixa | PLAYFUL no dia 30 ≥ [fração a definir] do dia 1; GLOOM no dia 30 ≤ [valor a definir] Hz, ou ≤ [fração a definir] do valor sem homeostase (4,8 Hz, simulado); um comando reproduz o resultado. **Os números são decisão pendente do Cantyll. Sem eles, o B2 não tem critério de aceitação** |
+| Piso por taxa-alvo e simulação de 30 noites (pendente, B2) | `ferramentas/simular_noites.py`, com semente fixa | PLAYFUL no dia 30 ≥ [fração a definir] do dia 1; GLOOM no dia 30 ≤ [valor a definir] Hz, ou ≤ [fração a definir] do valor sem homeostase (referência a ser refeita pelo B2, seção 9.4); um comando reproduz o resultado. **Os números são decisão pendente do Cantyll. Sem eles, o B2 não tem critério de aceitação** |
 | Hipocampo: episódio sem travessura entra no replay (pendente, ME-1) | replay com episódios de qualquer momento marcante | o replay não colapsa para só episódios negativos |
 | Lembrança por pista parcial (pendente, ME-3) | metade do padrão como pista, em assembleia recorrente | a assembleia reativa o resto acima do acaso; padrões diferentes não se misturam |
 | Determinismo | save → load → step, com semente fixa | spikes idênticos |
