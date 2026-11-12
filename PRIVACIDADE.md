@@ -33,7 +33,7 @@ De cada personagem, em `memory/pets/<pet>/` (um personagem não lê a memória d
 | Arquivo | Conteúdo |
 |---|---|
 | `nervous.json` | Estado da rede neural (habituação e aprendizado) |
-| `episodes.jsonl`, `preferences.json` | Resultado de cada travessura e preferências aprendidas |
+| `episodes.jsonl`, `preferences.json` | Resultado de cada travessura, o nível dos sentidos naquele momento, como digitação e trabalho (para o replay do sono; sem o conteúdo do que foi digitado) e preferências aprendidas |
 | `conditioning.json` | O que ele aprendeu a antecipar |
 | `drives.json` | Energia, estimulação, carência e pressão de sono |
 | `protest.json`, `sad_protest.json` | Insatisfação e tristeza |

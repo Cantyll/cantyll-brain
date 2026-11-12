@@ -11,6 +11,7 @@ Cérebro e regras puras: rede neural, emoção, homeostase, memória, condiciona
 | `conditioning.py` | Ele aprende a reagir ANTES do que costuma acontecer com ele. |
 | `emotion.py` | Da atividade dos neurônios motores para UMA emoção. |
 | `episodic.py` | O que aconteceu de verdade, e o que fazer da próxima vez. |
+| `homeostase_sinaptica.py` | HOMEOSTASE SINÁPTICA (spec, seção 9.4; decisão D4, hipótese SHY): o sono desfaz uma parte do aprendizado, e o replay só empurra uma sinapse até uma fração do seu limite. |
 | `homeostasis.py` | Variáveis internas que o pet tenta manter em equilíbrio. |
 | `motor.py` | A atividade dos neurônios motores controla o corpo DIRETAMENTE. |
 | `nervous_system.py` | A rede neural pulsada do pet (neurônios de integração e disparo com vazamento). |
