@@ -50,28 +50,21 @@ def test_com_teto_a_sinapse_do_medo_nao_passa_da_fracao_do_limite():
     assert com.learned[:, j].max() <= ajustes.HOMEOSTASE_TETO * ns.LEARN_MAX + 1e-9
 
 
-def test_downscaling_do_sono_acompanha_o_sono_cumprido(tmp_path):
-    """Antes era uma vez por adormecer: acordar e voltar a dormir desfazia mais 20%. Agora vale a pressão de sono descarregada."""
+def test_downscaling_do_sono_acontece_uma_vez_por_sono(tmp_path):
     class _Sem:
-        pressao = 0.8
+        pressao = 0.9
 
-    drives = _Sem()
     mem = EpisodicMemory(tmp_path / "episodes.jsonl", tmp_path / "preferences.json")
-    sono = SleepController(None, drives, mem, lambda: False)
+    sono = SleepController(None, _Sem(), mem, lambda: False)
     brain = LIFBrain(seed=7, seed_ruido=42)
     brain.learned[:] = 0.05
     brain._apply_learning()
-    for _ in range(3):                                       # adormece e é acordado na hora, três vezes: nada se desfaz
-        sono.fall_asleep()
-        sono.replay_passo(brain, 0, 0.004)
-        sono.wake(startled=False)
-    assert np.allclose(brain.learned, 0.05)
-    noite = ajustes.LIMIAR_DORME_PRESSAO - ajustes.LIMIAR_ACORDA_PRESSAO
     sono.fall_asleep()
-    for k in range(1, 101):                                  # uma noite inteira, sem episódios para o replay
-        drives.pressao = 0.8 - noite * k / 100
-        sono.replay_passo(brain, 0, 0.004)
+    sono.replay_passo(brain, 0, 0.004)                       # orçamento zero: só o downscaling acontece
+    assert np.allclose(brain.learned, 0.05 * (1.0 - ajustes.HOMEOSTASE_SHY))
+    sono.replay_passo(brain, 0, 0.004)                       # mesmo sono: não desfaz de novo
+    assert np.allclose(brain.learned, 0.05 * (1.0 - ajustes.HOMEOSTASE_SHY))
     sono.wake(startled=False)
-    desfeito = 1.0 - float(brain.learned.mean()) / 0.05
-    parcela = 1.0 / ajustes.HOMEOSTASE_AJUSTES_NOITE
-    assert (1.0 - (1.0 - ajustes.HOMEOSTASE_SHY) ** (1.0 - parcela)) - 1e-9 <= desfeito <= ajustes.HOMEOSTASE_SHY + 1e-9
+    sono.fall_asleep()
+    sono.replay_passo(brain, 0, 0.004)                       # outro sono: desfaz mais uma vez
+    assert np.allclose(brain.learned, 0.05 * (1.0 - ajustes.HOMEOSTASE_SHY) ** 2)

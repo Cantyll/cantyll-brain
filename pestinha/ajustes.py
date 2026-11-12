@@ -163,9 +163,8 @@ REPLAY_MS_POR_FRAME = 100       # simulação de replay por quadro, para a tela 
 # Homeostase sináptica no sono (decisão D4, hipótese SHY; spec, seção 9.4)
 # Sem isso, o replay de episódios negativos levava a tristeza (GLOOM) ao teto e ela ficava lá.
 # ---------------------------------------------------------------------------
-HOMEOSTASE_SHY = 0.2            # uma noite inteira de sono desfaz essa fração das sinapses aprendidas; um cochilo desfaz a parte dele (pela pressão de sono descarregada)
+HOMEOSTASE_SHY = 0.2            # cada sono desfaz essa fração das sinapses aprendidas (downscaling, uma vez por sono)
 HOMEOSTASE_TETO = 0.5           # o replay para de empurrar uma sinapse em 50% do seu limite (LEARN_MAX / LEARN_MIN)
-HOMEOSTASE_AJUSTES_NOITE = 10   # parcelas de uma noite inteira: a cada parcela de sono cumprida, a rede desfaz a parte dela do SHY
 
 # ---------------------------------------------------------------------------
 # Validação
@@ -255,9 +254,6 @@ _LIMITES = {
     "LADO_JANELA_PET": (int, 100, 1000),
     "ZZZ_QUANTIDADE": (int, 0, 20),
     "ZZZ_PERIODO": (float, 0.1, 60.0),
-    "HOMEOSTASE_SHY": (float, 0.0, 0.99),
-    "HOMEOSTASE_TETO": (float, 0.01, 1.0),
-    "HOMEOSTASE_AJUSTES_NOITE": (int, 1, 100),
 }
 
 

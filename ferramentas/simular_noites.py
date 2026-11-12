@@ -5,6 +5,8 @@ aprendizado faz em semanas: se alguma população morre (PLAYFUL) ou satura (GLO
     python ferramentas/simular_noites.py                      # 30 noites, cenário "duro"
     python ferramentas/simular_noites.py --cenario misto      # outro cenário (veja CENARIOS)
     python ferramentas/simular_noites.py --noites 60 --semente 3 --json saida.json
+    python ferramentas/simular_noites.py --sonos 3            # a noite picada em 3 sonos (acordado e dormindo de novo)
+    python ferramentas/simular_noites.py --sem-shy            # roda também o controle sem SHY
     python ferramentas/simular_noites.py --pulsos             # o replay simula os pulsos (mais lento, mesmas sinapses)
 
 É critério de aceitação de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase
@@ -24,6 +26,9 @@ O que é suposição, e não medida de uso real:
 - A noite: ele adormece com pressão de sono PRESSAO_AO_DORMIR e acorda em LIMIAR_ACORDA_PRESSAO. A
   pressão só anda quando não há replay para simular, como numa noite de verdade, em que uma hora de
   sono é muito mais longa que os segundos de replay.
+- A noite picada (--sonos N): a mesma queda de pressão, repartida por igual em N sonos. Entre um e outro
+  ele acorda (carinho, susto, o app reaberto) e adormece de novo na hora. Cada adormecer monta a fila de
+  replay outra vez, como no app.
 
 Como ler a saída: "uso" é a taxa média da população nos contextos do cenário, medida de manhã num
 gêmeo da rede com ruído fixo. A coluna % compara com o dia 0 (nada aprendido). "peso GLOOM" é a maior
@@ -75,6 +80,7 @@ CENARIOS = {
 }
 
 PRESSAO_AO_DORMIR = 0.82        # P de quem ficou ~14 h acordado depois de acordar em 0,25 (ritmo.py)
+DEGRAUS_DA_NOITE = 40           # em quantos degraus a pressão cai numa noite inteira
 MEDIDA_AQUECE_MS = 300
 MEDIDA_MS = 2000                # por contexto, em cada medida
 MEDIDA_SEMENTE = 99             # ruído do gêmeo de medida: o mesmo em todos os dias
@@ -181,11 +187,11 @@ def simular_dia(brain, memoria, rng, cenario, perfil):
 
 def simular_noite(brain, sono, perfil, pressao_ao_dormir=PRESSAO_AO_DORMIR, pressao_ao_acordar=None):
     """
-    Uma noite pelo SleepController real: adormece, e a cada quadro o sono tem 100 ms de simulação para
-    replay, e o SHY acompanha a pressão. A pressão cai um pouco só nos quadros em que não havia nada para simular.
+    Um sono pelo SleepController real: adormece, e a cada quadro o sono tem 100 ms de simulação para o
+    replay e a homeostase. A pressão cai um pouco só nos quadros em que não havia nada para simular.
     """
     fim = ajustes.LIMIAR_ACORDA_PRESSAO if pressao_ao_acordar is None else pressao_ao_acordar
-    degrau = (pressao_ao_dormir - fim) / (4.0 * ajustes.HOMEOSTASE_AJUSTES_NOITE)
+    degrau = (PRESSAO_AO_DORMIR - ajustes.LIMIAR_ACORDA_PRESSAO) / DEGRAUS_DA_NOITE
     sono.drives.pressao = pressao_ao_dormir
     sono.fall_asleep()
     while True:
@@ -222,10 +228,11 @@ def medir(brain):
     return uso, por_contexto
 
 
-def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, **trocas):
+def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, sonos=1, **trocas):
     """
     Roda `noites` dias e noites. dias: em quais manhãs medir (padrão DIAS_PADRAO; o dia 0 e o último entram sempre).
     pulsos: True simula os pulsos no replay, como o app (mais lento, mesmas sinapses no LIFBrain).
+    sonos: em quantos sonos cada noite é picada (1: a noite inteira de uma vez).
     trocas: valores de ajustes.py só para esta simulação (por exemplo HOMEOSTASE_SHY=0.0, para comparar).
     Devolve uma lista de linhas (dict), uma por manhã medida. A última traz também "aprendido".
     """
@@ -244,6 +251,7 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
         sono = SleepController(None, _Necessidades(), memoria, lambda: False)
         rng = np.random.default_rng(semente)
         j = {post: k for k, post in enumerate(brain.plastic_posts)}
+        pressoes = np.linspace(PRESSAO_AO_DORMIR, ajustes.LIMIAR_ACORDA_PRESSAO, int(sonos) + 1)
         base = None
         for dia in range(noites + 1):
             if dia in dias:
@@ -261,7 +269,8 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
                 linhas[-1]["aprendido"] = brain.learned.tolist()
                 break
             simular_dia(brain, memoria, rng, regras, perfil)
-            simular_noite(brain, sono, perfil)
+            for de, ate in zip(pressoes[:-1], pressoes[1:]):
+                simular_noite(brain, sono, perfil, float(de), float(ate))
     return linhas
 
 
@@ -277,7 +286,7 @@ def imprimir(titulo, linhas):
         uso, rel = linha["uso_hz"], linha["uso_relativo"]
         print(f"  {linha['dia']:3d} | {uso['PLAYFUL']:5.2f} Hz {_porcento(rel['PLAYFUL'])}   | "
               f"{uso['CALM']:5.2f} Hz {_porcento(rel['CALM'])}   | {uso['GLOOM']:6.2f} Hz | {uso['SAD']:5.2f}Hz | "
-              f"{100 * linha['peso_gloom_max']:5.0f}% lim | {-100 * linha['peso_playful_min']:6.0f}% lim")
+              f"{100 * linha['peso_gloom_max']:5.0f}% lim | {-100 * linha['peso_playful_min'] + 0.0:6.0f}% lim")
     print()
 
 
@@ -288,6 +297,7 @@ def main():
     parser.add_argument("--cenario", default="duro", choices=sorted(CENARIOS))
     parser.add_argument("--noites", type=int, default=30)
     parser.add_argument("--semente", type=int, default=7)
+    parser.add_argument("--sonos", type=int, default=1, help="em quantos sonos cada noite é picada (padrão: 1)")
     parser.add_argument("--sem-shy", action="store_true", help="roda também sem o SHY (HOMEOSTASE_SHY = 0), para comparar")
     parser.add_argument("--pulsos", action="store_true", help="simula os pulsos no replay, como o app (mais lento)")
     parser.add_argument("--json", help="grava as linhas neste arquivo")
@@ -295,11 +305,11 @@ def main():
 
     regras = CENARIOS[args.cenario]
     print(f"Cenário {args.cenario}: {regras['descricao']}. Perfil {regras['perfil']}, semente {args.semente}, "
-          f"{args.noites} noites.\n")
-    saida = {"com_shy": simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos)}
+          f"{args.noites} noites, {args.sonos} sono(s) por noite.\n")
+    saida = {"com_shy": simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos)}
     imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}", saida["com_shy"])
     if args.sem_shy:
-        saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, HOMEOSTASE_SHY=0.0)
+        saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, HOMEOSTASE_SHY=0.0)
         imprimir("Sem SHY (HOMEOSTASE_SHY = 0)", saida["sem_shy"])
     if args.json:
         Path(args.json).write_text(json.dumps(saida, ensure_ascii=False, indent=1), encoding="utf-8")

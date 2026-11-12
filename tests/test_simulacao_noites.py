@@ -1,7 +1,6 @@
 """
-SHY repartido pelo sono cumprido e a simulação de noites (B2 do plano; spec, seção 9.4). A simulação
-de 30 noites é critério de aceitação de toda mudança em dinâmica de neurônio, plasticidade, replay
-ou homeostase.
+A simulação de noites (B2 do plano; spec, seção 9.4). A simulação de 30 noites é critério de aceitação
+de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase.
 
 Os testes de aceitação usam réguas relativas: a comparação com a mesma simulação sem SHY e com o dia 0
 da própria simulação. Os números absolutos da seção 10 da spec são decisão pendente.
@@ -9,7 +8,6 @@ da própria simulação. Os números absolutos da seção 10 da spec são decis�
 Rodar: python -m pytest tests/test_simulacao_noites.py -q
 Só os rápidos: python -m pytest tests/test_simulacao_noites.py -q -k "not trinta_noites"
 """
-import math
 import sys
 from pathlib import Path
 
@@ -17,77 +15,10 @@ import numpy as np
 import pytest
 
 from pestinha import ajustes
-from pestinha.core.homeostase_sinaptica import HomeostaseDoSono
 from pestinha.core.nervous_system import Brain, LIFBrain
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
 import simular_noites  # noqa: E402
-
-NOITE = ajustes.LIMIAR_DORME_PRESSAO - ajustes.LIMIAR_ACORDA_PRESSAO
-
-
-class _RedeFalsa:
-    """Rede que só anota o que a homeostase do sono pede."""
-
-    def __init__(self):
-        self.restou = 1.0                   # fração das sinapses que sobrou depois dos downscalings
-
-    def downscaling_sono(self, fracao):
-        self.restou *= 1.0 - fracao
-
-
-def _dorme(homeostase, rede, de, ate, quadros=200):
-    """Um sono: a pressão cai de `de` até `ate` em `quadros` chamadas, e ele acorda."""
-    homeostase.adormecer(de)
-    for k in range(1, quadros + 1):
-        homeostase.passo(rede, de + (ate - de) * k / quadros)
-    homeostase.acordar()
-
-
-def _noites_desfeitas(rede):
-    """Quantas noites inteiras de SHY a rede falsa recebeu."""
-    return math.log(rede.restou) / math.log(1.0 - ajustes.HOMEOSTASE_SHY)
-
-
-# ---------------- SHY pelo sono cumprido ----------------
-
-def test_noite_inteira_desfaz_o_shy_de_uma_noite():
-    rede, sono = _RedeFalsa(), HomeostaseDoSono()
-    _dorme(sono, rede, ajustes.LIMIAR_DORME_PRESSAO, ajustes.LIMIAR_ACORDA_PRESSAO)
-    parcela = 1.0 / ajustes.HOMEOSTASE_AJUSTES_NOITE
-    assert abs(_noites_desfeitas(rede) - 1.0) <= parcela + 1e-9      # a sobra de menos de uma parcela fica para o próximo sono
-
-
-def test_cochilo_desfaz_so_a_parte_dele_e_cochilos_somam_uma_noite():
-    rede, sono = _RedeFalsa(), HomeostaseDoSono()
-    _dorme(sono, rede, 0.6, 0.6 - NOITE / 5)                         # um quinto de noite
-    um_cochilo = _noites_desfeitas(rede)
-    assert 0.05 < um_cochilo < 0.35
-    for _ in range(4):
-        _dorme(sono, rede, 0.6, 0.6 - NOITE / 5)
-    assert abs(_noites_desfeitas(rede) - 1.0) <= 1.0 / ajustes.HOMEOSTASE_AJUSTES_NOITE + 1e-9
-
-
-def test_adormecer_e_acordar_sem_dormir_nao_desfaz_nada():
-    rede, sono = _RedeFalsa(), HomeostaseDoSono()
-    for _ in range(20):                                             # acordado com carinho vinte vezes na mesma noite
-        _dorme(sono, rede, 0.8, 0.8, quadros=5)
-    assert rede.restou == 1.0
-
-
-def test_pressao_que_sobe_dormindo_nao_conta_como_sono():
-    rede, sono = _RedeFalsa(), HomeostaseDoSono()
-    _dorme(sono, rede, 0.5, 0.9)
-    assert rede.restou == 1.0
-
-
-def test_sobra_de_um_sono_vale_para_o_seguinte():
-    rede, sono = _RedeFalsa(), HomeostaseDoSono()
-    meia_parcela = NOITE / (2 * ajustes.HOMEOSTASE_AJUSTES_NOITE)
-    _dorme(sono, rede, 0.6, 0.6 - meia_parcela)                      # menos de uma parcela: nada ainda
-    assert rede.restou == 1.0
-    _dorme(sono, rede, 0.6, 0.6 - 1.2 * meia_parcela)                # com a sobra do primeiro, fecha uma parcela
-    assert rede.restou < 1.0
 
 
 # ---------------- a interface ----------------
@@ -132,6 +63,22 @@ def test_mesma_semente_repete_e_outra_semente_muda():
     c = simular_noites.simular("misto", noites=2, semente=4, dias=(2,))
     assert a == b
     assert a[-1]["aprendido"] != c[-1]["aprendido"]
+
+
+def test_noite_picada_em_sonos_adormece_mais_vezes(monkeypatch):
+    """sonos=1 é a noite inteira (o padrão). Com sonos=3, ele adormece três vezes por noite, e o resultado muda:
+    hoje o replay e o SHY valem por adormecer, não pelo sono cumprido."""
+    adormeceu = []
+    original = simular_noites.SleepController.fall_asleep
+    monkeypatch.setattr(simular_noites.SleepController, "fall_asleep",
+                        lambda self: (adormeceu.append(self.drives.pressao), original(self))[1])
+    inteira = simular_noites.simular("misto", noites=2, semente=3, dias=(2,))
+    assert len(adormeceu) == 2
+    assert simular_noites.simular("misto", noites=2, semente=3, dias=(2,), sonos=1) == inteira
+    adormeceu.clear()
+    picada = simular_noites.simular("misto", noites=2, semente=3, dias=(2,), sonos=3)
+    assert len(adormeceu) == 6 and adormeceu[0] > adormeceu[1] > adormeceu[2] > ajustes.LIMIAR_ACORDA_PRESSAO
+    assert picada[-1]["aprendido"] != inteira[-1]["aprendido"]
 
 
 def test_simular_devolve_os_ajustes_ao_que_eram():
