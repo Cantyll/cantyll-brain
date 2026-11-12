@@ -11,6 +11,7 @@
 - Jorge perdeu o temperamento `LONELY->GLOOM`, porque essa ligação deixou de existir.
 - A rede tem 15808 sinapses (antes 15939, semente 7): saíram as ligações de cansaço para tristeza e para o cantinho.
 - Replay noturno (M3): ao dormir, até 50 episódios, os mais marcantes, voltam à rede por 0,5 s cada, com δ = 0,5 · δ. Cada episódio passa a guardar o nível dos sentidos naquele momento (`sentidos` em `episodes.jsonl`). Episódios antigos, sem esse dado, não entram no replay.
+- Replay e homeostase sináptica valem pela dívida de sono, não por adormecer. Antes, acordar no meio da noite (carinho, susto, o app reaberto) e dormir de novo refazia o replay de 50 episódios e mais 20% de SHY a cada vez. Agora cada sono cobra a pressão de sono que subiu desde o ponto mais baixo do último sono: uma noite de dívida vale o sono completo de antes; menos que isso vale a parte dela. Uma noite inteira, sem acordar, fica igual a antes.
 - Homeostase sináptica no sono (SHY, decisão D4): ao adormecer, cada sinapse aprendida perde 20%, e o replay para de empurrar uma sinapse ao chegar a 50% do seu limite. Antes, a tristeza de episódios negativos subia ao teto e ficava lá: 4,8 Hz em 30 noites de uso misto. Com a homeostase, o peso fica perto de 0,02 e a tristeza fica entre 0,2 e 1 Hz nas simulações (dias 10 a 30).
 - Problema aberto: a brincadeira (PLAYFUL) cai a zero nas simulações de 30 noites, com ou sem homeostase. O replay por |δ| traz quase só episódios negativos, e a brincadeira não se recupera sozinha.
 
@@ -19,6 +20,7 @@
 - Interface `Brain` com `learn` (erro de predição), `avancar`, `estado` e versão. `criar_cerebro` escolhe o cérebro pela configuração; hoje só existe `lif`.
 - `LIFBrain(seed_ruido=...)`: com semente, o ruído se repete. Sem semente, continua aleatório, como antes.
 - `drives.json` ganha `pressao`. Arquivo antigo carrega com o valor inicial (0,3).
+- `drives.json` ganha `pressao_quitada` (a pressão mais baixa do último sono). Arquivo antigo carrega sem ela, e o próximo sono vale uma noite inteira.
 
 ## 0.8.0 — melhorias para o Windows
 
