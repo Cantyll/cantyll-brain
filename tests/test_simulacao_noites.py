@@ -66,8 +66,8 @@ def test_mesma_semente_repete_e_outra_semente_muda():
 
 
 def test_noite_picada_em_sonos_adormece_mais_vezes(monkeypatch):
-    """sonos=1 é a noite inteira (o padrão). Com sonos=3, ele adormece três vezes por noite, e o resultado muda:
-    hoje o replay e o SHY valem por adormecer, não pelo sono cumprido."""
+    """sonos=1 é a noite inteira (o padrão). Com sonos=3, ele adormece três vezes por noite, e o resultado não muda:
+    o replay e o SHY valem pela dívida de sono, não por adormecer, e a noite picada tem a mesma dívida."""
     adormeceu = []
     original = simular_noites.SleepController.fall_asleep
     monkeypatch.setattr(simular_noites.SleepController, "fall_asleep",
@@ -78,7 +78,7 @@ def test_noite_picada_em_sonos_adormece_mais_vezes(monkeypatch):
     adormeceu.clear()
     picada = simular_noites.simular("misto", noites=2, semente=3, dias=(2,), sonos=3)
     assert len(adormeceu) == 6 and adormeceu[0] > adormeceu[1] > adormeceu[2] > ajustes.LIMIAR_ACORDA_PRESSAO
-    assert picada[-1]["aprendido"] != inteira[-1]["aprendido"]
+    assert picada == inteira
 
 
 def test_simular_devolve_os_ajustes_ao_que_eram():

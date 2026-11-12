@@ -48,6 +48,7 @@ class Drives:
         self.stimulation = 0.6
         self.contact = 0.0
         self.pressao = ajustes.PRESSAO_INICIAL     # P: adenosina, 0 a 1; decide o sono junto com o relógio (ritmo.py)
+        self.pressao_quitada = None                # P mais baixa do último sono: a dívida de sono é o que subiu daí (mind/sleep.py)
 
     # ---------------- acontecimentos ----------------
 
@@ -102,9 +103,11 @@ class Drives:
     # ---------------- persistência ----------------
 
     def save(self, path):
-        """Grava energia, estimulação e contato em drives.json."""
+        """Grava energia, estimulação, contato, a pressão de sono e a pressão já quitada em drives.json."""
         data = {"energy": self.energy, "stimulation": self.stimulation,
-                "contact": self.contact, "pressao": round(self.pressao, 6), "saved_at": time.time()}
+                "contact": self.contact, "pressao": round(self.pressao, 6),
+                "pressao_quitada": None if self.pressao_quitada is None else round(self.pressao_quitada, 6),
+                "saved_at": time.time()}
         write_json(path, data)
 
     def load(self, path, prof):
@@ -118,10 +121,13 @@ class Drives:
             stimulation = valor_real(data.get("stimulation", 0.6), 0.0, 1.0)
             contact = valor_real(data.get("contact", 0.0), 0.0, 1.0)
             pressao = valor_real(data.get("pressao", ajustes.PRESSAO_INICIAL), 0.0, 1.0)
+            quitada = data.get("pressao_quitada")
+            quitada = None if quitada is None else valor_real(quitada, 0.0, 1.0)
         except (TypeError, ValueError):
             return False                        # arquivo com tipos errados: fica com os valores iniciais
         self.energy = clamp(energy + elapsed / prof["sleep_recover"])
         self.stimulation = clamp(stimulation - elapsed / prof["stim_decay"])
         self.contact = clamp(contact + 0.3 * elapsed / prof["contact_span"])
         self.pressao = pressao                  # fechado não avança: a pausa congela P (spec, seção 6)
+        self.pressao_quitada = quitada          # sem o dado (arquivo antigo): o próximo sono vale uma noite inteira
         return True

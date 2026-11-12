@@ -106,3 +106,21 @@ def test_replay_passo_gasta_o_orcamento_e_acordar_limpa_a_fila(tmp_path):
     sono.replay_fila = [{"sentidos": {"WORK": 0.8}, "delta": 0.3, "restante": 200}]
     sono.wake(startled=False)                        # acordou no meio: o que sobrou não roda
     assert sono.replay_fila == []
+
+
+def test_replay_vale_pela_divida_de_sono(tmp_path):
+    """Meia noite de dívida: metade da fila. Dormir de novo sem a pressão subir: nenhum replay."""
+    sono = _dorme(tmp_path, 60)
+    assert len(sono.replay_fila) == ajustes.REPLAY_EPISODIOS          # o primeiro sono vale uma noite
+    completa = [item["delta"] for item in sono.replay_fila]
+    sono.drives.pressao = ajustes.LIMIAR_ACORDA_PRESSAO
+    sono.wake(startled=False)
+    sono.fall_asleep()                                               # acordou e dormiu de novo na hora
+    assert sono.replay_fila == []
+    sono.wake(startled=False)
+    sono.drives.pressao = ajustes.LIMIAR_ACORDA_PRESSAO + 0.3 * sono.noite()
+    sono.fall_asleep()
+    total = sum(item["restante"] for item in sono.replay_fila)
+    assert total == round(0.3 * ajustes.REPLAY_EPISODIOS * ajustes.REPLAY_MS)
+    assert [item["delta"] for item in sono.replay_fila] == completa[:len(sono.replay_fila)]   # os mais marcantes primeiro
+    assert all(0 < item["restante"] <= ajustes.REPLAY_MS for item in sono.replay_fila)
