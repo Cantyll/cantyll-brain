@@ -80,9 +80,9 @@ Dois fatos sobre a base que pesam sobre tudo o que vem depois:
    | Sem homeostase | 2,47 Hz | zero a partir do dia 26 | 6,04 Hz |
 
    A homeostase evita o colapso, mas a brincadeira ainda perde dois terços nessa rodada, com muita variação
-   de um dia para o outro (2,56 Hz no dia 15, 0,54 Hz no dia 27). Na ferramenta do B2 (PR #8, ainda não
-   mesclado), num cenário só de dispensas e sem carinho, quem mais cai é a calma (CALM, 32% do dia 0 no
-   dia 30), e a PLAYFUL fica em 67%. O piso por taxa-alvo, que trataria isso, foi cancelado pelo Cantyll
+   de um dia para o outro (2,56 Hz no dia 15, 0,54 Hz no dia 27). Na ferramenta do B2 (PR #8, commit
+   `4185dc1`, ainda não mesclado), num cenário só de dispensas e sem carinho, quem mais cai é a calma
+   (CALM, 25% do dia 0 no dia 30), e a PLAYFUL fica em 60%. O piso por taxa-alvo, que trataria isso, foi cancelado pelo Cantyll
    em 2026-11-12.
 2. **A simulação de noites ainda não está na `main`.** Ela entra com o B2. É o único instrumento de longo
    prazo que o projeto tem, e precisa existir antes de qualquer troca de neurônio.
@@ -214,8 +214,8 @@ Valores canônicos de Izhikevich (2003). Conferir no artigo antes de usar.
 
 1. **Cérebro novo ao lado do antigo.** `BioBrain`, em arquivos novos, escolhido por `config.CEREBRO`. O
    `LIFBrain` fica como base de comparação (R7) e não recebe função nova: todo trabalho novo do núcleo vai
-   para o `BioBrain` (decisão V1, aprovada pelo Cantyll em 2026-11-12). A última mudança no LIF é o que o
-   B2 mantiver depois do cancelamento do piso.
+   para o `BioBrain` (decisão V1, aprovada pelo Cantyll em 2026-11-12). A última mudança no LIF é a medida
+   `taxas()`, do B2.
 2. **Paridade primeiro.** O `BioBrain` nasce com todas as populações em LIF, sobre projeções esparsas. Só
    passa adiante quando a suíte atual inteira roda nele.
 3. **Uma população por vez.** Cada população tem a sua dinâmica. Ordem: populações novas (workspace) já
@@ -351,7 +351,7 @@ decididas.
 ## 12. Riscos e pontos cegos
 
 - **A base só tem evidência simulada, de uma semente.** A homeostase evita o colapso, mas a brincadeira
-  cai a 35% em 30 noites num cenário e a calma cai a 32% em outro (seção 3), e o piso que trataria isso
+  cai a 35% em 30 noites num cenário e a calma cai a 25% em outro (seção 3), e o piso que trataria isso
   foi cancelado. Não há nenhuma semana de uso real medida. Seis camadas em cima disso herdam o que essa
   base fizer em meses.
 - **Um número errado já circulou.** "PLAYFUL a zero" foi do CHANGELOG para este documento e daqui para o
