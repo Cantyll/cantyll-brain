@@ -1,6 +1,6 @@
 # Visão: do Pestinha ao Cantyll
 
-**Versão:** 0.2 (2026-11-12)
+**Versão:** 0.3 (2026-11-12)
 **Estado:** visão e direção. Nenhum código foi alterado por este documento.
 **Relação com os outros documentos:** a [especificação do núcleo biológico](ESPECIFICACAO_NUCLEO_BIOLOGICO.md)
 continua valendo para o núcleo (fases M0 a M7, regras R1 a R7, testes de aceitação). Este documento diz
@@ -329,24 +329,25 @@ que não se formam nesta escala) são registrados como resultado.
 | Seção 13, ordem das fases | M0, M3, M2, M5, M6 no LIF; M1 por último | M0 e M3 no LIF (PR #5); depois paridade do `BioBrain`, M1 por população, e M2, M5, M6 nele | Consequência da D10 |
 | Seções 9.5 e 16, CA3 e giro denteado | Fora de escopo | Hipocampo rápido entra (seção 6): episódios gerais (ME-1) e lembrança por pista parcial, tipo CA3 (ME-3). Giro denteado continua fora | Consequência da decisão de memória |
 | D5, gânglios da base liberam ação | Pendente | Continua pendente. O workspace não substitui essa decisão | Sem mudança |
+| Seção 10, valor percebido | Critério medido em uma semana de uso real com cada cérebro | Continua como medida, mas não segura a troca do padrão para o `BioBrain`. A comparação fica para depois da troca, pela fotografia diária | Decidido pelo Cantyll (V7, 2026-11-12) |
 | Seção 7.3, escalonamento homeostático | Especificado | Não entra. O piso por taxa-alvo foi cancelado; a premissa que o tornava urgente (PLAYFUL a zero) não se reproduziu | Decidido pelo Cantyll (2026-11-12) |
 
 A spec só é editada por um PR próprio, depois do merge do PR #5, para não conflitar com ele.
 
-## 11. Decisões pendentes do Cantyll
+## 11. Decisões do Cantyll
 
-Cada linha tem um padrão adotado neste documento. Sem resposta, o plano segue o padrão. V1 e V2 já foram
-decididas.
+As sete decisões foram tomadas pelo Cantyll em 2026-11-12. A coluna "Era" guarda a opção que não foi
+escolhida. Da spec, continua pendente só a D5 (gânglios da base liberam ação).
 
-| ID | Decisão | Padrão adotado | Alternativa |
+| ID | Decisão | Decidido | Era |
 |---|---|---|---|
-| V1 | Onde entra o trabalho novo do núcleo (D10) | **Decidido (2026-11-12):** só no `BioBrain`; o trabalho novo pode começar | Era: manter as duas redes em paralelo |
-| V2 | Neurogênese (D9) | **Decidido (2026-11-12):** ligada, com teto de 1500 neurônios | Era: teto por custo, ou desligada até a sinaptogênese se provar |
+| V1 | Onde entra o trabalho novo do núcleo (D10) | Só no `BioBrain`; o trabalho novo pode começar | Manter as duas redes em paralelo |
+| V2 | Neurogênese (D9) | Ligada, com teto de 1500 neurônios | Teto por custo, ou desligada até a sinaptogênese se provar |
 | V3 | Fome | Ele se alimenta sozinho no lar; você alimentar é bônus | Sem fome |
-| V4 | Entrada da linguagem | Só texto escrito para ele | Microfone, com permissão própria e `PRIVACIDADE.md` novo |
-| V5 | Nível de som do sistema como sentido | Fora por enquanto | Entra, com leitura nova por sistema operacional |
-| V6 | Gravar os sentidos para os gêmeos de ablação | Permissão própria, desligada por padrão | Não gravar (perde o controle experimental) |
-| V7 | Semana de uso real antes de trocar o padrão para `BioBrain` | Obrigatória (critério "valor percebido" da spec) | Trocar quando os testes passarem |
+| V4 | Entrada da linguagem | Só texto escrito para ele. O microfone fica em aberto para depois, fora do plano | Microfone agora, com permissão própria e `PRIVACIDADE.md` novo |
+| V5 | Nível de som do sistema como sentido | Fora por enquanto | Entrar, com leitura nova por sistema operacional |
+| V6 | Gravar os sentidos para os gêmeos de ablação | Grava, com permissão própria, desligada por padrão | Não gravar (perde o controle experimental) |
+| V7 | Semana de uso real antes de trocar o padrão para `BioBrain` | Não é exigida. O padrão troca quando a suíte e a simulação de noites passarem (portão D do plano) | Semana obrigatória (critério "valor percebido" da spec) |
 
 ## 12. Riscos e pontos cegos
 
@@ -354,6 +355,10 @@ decididas.
   cai a 35% em 30 noites num cenário e a calma cai a 25% em outro (seção 3), e o piso que trataria isso
   foi cancelado. Não há nenhuma semana de uso real medida. Seis camadas em cima disso herdam o que essa
   base fizer em meses.
+- **O padrão vai trocar sem uso real medido.** A V7 tirou a semana de uso real do caminho: o `BioBrain` vira
+  o padrão quando a suíte e a simulação de noites passarem. Teste e simulação dizem se ele é estável, não se
+  ele parece mais vivo para quem usa. A proteção que sobra é a volta para `lif` por configuração (NE-5 do
+  plano) e a fotografia diária, que passa a ser a única medida do "valor percebido".
 - **Um número errado já circulou.** "PLAYFUL a zero" foi do CHANGELOG para este documento e daqui para o
   plano sem ninguém rodar a simulação. Número de simulação só entra em documento com o comando que o
   reproduz.

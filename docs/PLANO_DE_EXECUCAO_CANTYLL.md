@@ -1,6 +1,6 @@
 # Plano de execução do Cantyll em pull requests
 
-**Versão:** 0.2 (2026-11-12)
+**Versão:** 0.3 (2026-11-12)
 **Para quê:** dividir a [visão do Cantyll](VISAO_CANTYLL.md) em pull requests que threads diferentes possam
 fazer ao mesmo tempo sem se atrapalhar. Diz, para cada PR: os arquivos de que ele é dono, do que depende, a
 ordem de merge e o critério de pronto.
@@ -51,6 +51,7 @@ de sair de rascunho.
 
 ```text
 ONDA 0   #5 (replay + SHY) ──► B2 (simulação de noites; piso cancelado) ──► B3 (spec e arquitetura)
+         B4 (conserto do sono: replay e SHY pela dívida de sono) ◄─ B2
          B1 (este PR, só documentos)
 
 ONDA 1   T1 (trilhos do app) ──┐
@@ -68,7 +69,7 @@ ONDA 3   PL-2 ◄─ PL-1          ME-2 ◄─ PL-1         CR-1 ◄─ PL-1
 ONDA 4   EU-2 ◄─ EU-1, PL-2    CR-2 ◄─ CR-1, EU-1   CR-3 ◄─ CR-1
          LI-1 ◄─ PL-1, NE-1 ─► LI-2 ◄─ WS-1 ─► WS-2 ◄─ ME-1 ─► LI-3
          ME-3 ◄─ ME-1, ME-2, NE-1
-         NE-5 (trocar o padrão para BioBrain) ◄─ NE-4 e uma semana de uso real
+         NE-5 (trocar o padrão para BioBrain) ◄─ NE-4, suíte e simulação de noites (portão D)
 ```
 
 ## 4. Os pull requests
@@ -81,8 +82,11 @@ ONDA 4   EU-2 ◄─ EU-1, PL-2    CR-2 ◄─ CR-1, EU-1   CR-3 ◄─ CR-1
 | B1 | fácil | Visão e este plano | `docs/VISAO_CANTYLL.md`, `docs/PLANO_DE_EXECUCAO_CANTYLL.md`, `docs/README.md` | nada (não toca arquivo do #5) | Revisado pelo Cantyll |
 | B2 | pesado | Simulação de noites como ferramenta e `taxas()` na interface `Brain` (opcional; devolve `{}` por padrão). **O piso por taxa-alvo foi cancelado pelo Cantyll em 2026-11-12**, e o SHY repartido pelo sono saiu do PR. É o PR #8 | `core/nervous_system.py` (só `taxas()`), `ferramentas/simular_noites.py` (novo), `tests/test_simulacao_noites.py` (novo) | #5 | Um comando reproduz as 30 noites com semente fixa. A linha de base do LIF (taxa de cada população plástica no dia 30, por cenário, com 5 sementes) fica registrada aqui ou, se o #8 entrar sem ela, no T2 |
 | B3 | fácil | Spec e arquitetura alinhadas com a visão: D9, D10, seções 13 e 16; R1 a R7 em `ARQUITETURA.md` | `docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md`, `docs/ARQUITETURA.md` | #5 e as decisões V1 e V2 da visão | Tabela da seção 10 da visão refletida na spec |
+| B4 | pesado | Conserto na `main`: replay e SHY cobrados pela dívida de sono, não a cada adormecer (uma noite picada em N sonos valia N noites de replay e de SHY). Aprovado pelo Cantyll em 2026-11-12. Ramo empilhado sobre o B2; não muda a interface `Brain` | `mind/sleep.py`, `core/homeostasis.py` (`pressao_quitada` em `drives.json`), `ajustes.py` (só comentários de duas constantes), `tests/test_homeostase_sinaptica.py`, `tests/test_replay.py`, `tests/test_simulacao_noites.py`, e a própria entrada no `CHANGELOG.md` | B2 | Critério relativo, decidido pelo Cantyll em 2026-11-12. Com 1 sono por noite: a taxa de cada população plástica no dia 30 fica dentro da faixa das 5 sementes da `main`. Com 6 sonos por noite: PLAYFUL, CALM e GLOOM ficam a no máximo 15% do valor de 1 sono |
 
-B2 é a última mudança no `LIFBrain`. Depois dele, `core/nervous_system.py` congela (só correção de bug), e
+Fora da contagem: o PR #9 corrige uma linha do `CHANGELOG.md` (a premissa da PLAYFUL) e não toca mais nada.
+
+B2 é a última mudança no `LIFBrain`. O B4 mexe no controle do sono, não na rede. Depois dele, `core/nervous_system.py` congela (só correção de bug), e
 todo trabalho novo do núcleo vai para o `BioBrain` (decisão V1, aprovada pelo Cantyll em 2026-11-12).
 
 **Correção da versão 0.1:** o plano dizia que o B2 existia "para a PLAYFUL não cair a zero". Essa queda não
@@ -131,7 +135,7 @@ Depois do T1, nenhuma frente edita `app.py`, `config.py` nem `paths.py`. Depois 
 | ME-1 | pesado | Hipocampo: episódios de qualquer momento marcante, replay equilibrado entre bons e ruins | `core/hipocampo.py` (novo), `core/episodic.py`, `tests/test_hipocampo_*.py` | T1, DOC-P2 | Episódio sem travessura entra no replay; simulação de noites sem colapso |
 | AC-1 | fácil | Fotografia diária, no formato da seção 8 | `core/diario.py` (novo), `tests/test_diario.py` | T1, DOC-P2 | Um arquivo por dia; dado inválido é recusado; "apagar todos os dados" apaga |
 | AC-2 | fácil | Painel de evolução e relatório em HTML | `ui/evolucao.py` (novo), `ferramentas/relatorio_evolucao.py` (novo), `tests/test_evolucao.py` | Só o formato da seção 8 | Curvas a partir de fotografias de exemplo; campos nulos não quebram |
-| AC-3 | pesado | Gravador dos sentidos e gêmeos de ablação | `core/gravador.py` (novo), `ferramentas/gemeos.py` (novo), `tests/test_gemeos.py` | T1, T2, DOC-P2, decisão V6 | A mesma gravação, com a mesma semente, dá o mesmo resultado; com um módulo desligado, a diferença é relatada |
+| AC-3 | pesado | Gravador dos sentidos e gêmeos de ablação | `core/gravador.py` (novo), `ferramentas/gemeos.py` (novo), `tests/test_gemeos.py` | T1, T2, DOC-P2 (V6 decidida: grava com permissão própria, desligada por padrão) | A mesma gravação, com a mesma semente, dá o mesmo resultado; com um módulo desligado, a diferença é relatada |
 | LAR-1 | fácil | O lar: canto fixo com cama; ele dorme na cama | `world/lar.py` (novo), `mind/lar_ctl.py` (novo), `body/behavior.py`, `tests/test_lar.py` | T1 | Não rouba foco; some em tela cheia; pausa e pânico funcionam |
 | LAR-2 | fácil | Canais de hora do dia e de presença | `sense/senses.py`, `core/bio/spec_corpo.py`, `tests/test_sentidos_corpo.py` | T2 | Canais chegam à rede nova; a rede antiga não muda |
 | LAR-4 | fácil | Presença em segundo plano: estado dele no ícone da bandeja | `ui/ui.py`, `tests/test_bandeja_estado.py` | T1 | Dormindo, acordado e pausado aparecem no ícone |
@@ -151,7 +155,7 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 | CR-1 | pesado | Sinaptogênese e poda, aplicadas no sono (spec, seção 7.5) | `core/bio/crescimento.py`, `tests/test_crescimento_*.py` | PL-1, DOC-P3 | Limite de grau respeitado; custo dentro do orçamento; R3 testada |
 | WS-1 | pesado | Workspace com três módulos (percepção, drives, modelo do eu), winner-take-all com FS | `core/bio/workspace.py`, `core/bio/spec_workspace.py`, `tests/test_workspace_*.py` | NE-1, EU-1 | Um vencedor por vez; tempo mínimo de permanência; guardas vetam |
 | TA-2 | pesado | Porta talâmica e via rápida de susto (spec, seções 8.2 e 9.1) | `core/bio/talamo.py`, `tests/test_talamo_*.py` | PL-2, NE-1 | Sono reduz a entrada em 50%; estímulo acima de 0,9 passa |
-| LAR-3 | pesado | Fome saciável por ele mesmo, e a comida do lar | `core/homeostasis.py`, `world/lar.py`, `mind/lar_ctl.py`, `tests/test_fome_*.py` | LAR-1, decisão V3 | 3 dias sem usuário: ele come sozinho; CARTAZ, FUGIR e tristeza não sobem |
+| LAR-3 | pesado | Fome saciável por ele mesmo, e a comida do lar | `core/homeostasis.py`, `world/lar.py`, `mind/lar_ctl.py`, `tests/test_fome_*.py` | LAR-1 (V3 decidida) | 3 dias sem usuário: ele come sozinho; CARTAZ, FUGIR e tristeza não sobem |
 | F3 | fácil | Fechamento da onda | os da regra 4 | todos os desta onda | Geradores sem diferença |
 
 ### Onda 4: pesquisa (cada item atrás do seu portão)
@@ -166,7 +170,7 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 | WS-2 | pesado | Memória e fala entram no workspace | `core/bio/workspace.py`, `core/bio/spec_workspace.py` | WS-1, ME-1, LI-2 | Um vencedor por vez com cinco módulos |
 | ME-3 | pesado | Lembrar por pista parcial: assembleias recorrentes que se completam a partir de um pedaço (tipo CA3) | `core/bio/assembleias.py`, `tests/test_assembleias_*.py` | ME-1, ME-2, NE-1 | Com metade do padrão como pista, a assembleia reativa o resto acima do acaso; padrões diferentes não se misturam |
 | LI-3 | pesado | Produção de sequência e auto-escuta | `core/linguagem/` | WS-2 | Produção acima do acaso; ausente, ele não fala |
-| NE-5 | fácil | Trocar o padrão para `cerebro = "bio"` | `config.py` (uma linha) | NE-4, portão D | Decisão do Cantyll |
+| NE-5 | fácil | Trocar o padrão para `cerebro = "bio"` | `config.py` (uma linha), `tests/test_troca_padrao.py` (novo) | NE-4, portão D | Portão D passa. Voltar para `"lif"` na configuração funciona, e a troca não apaga nem corrompe o estado salvo de nenhum dos dois cérebros |
 
 ## 5. Arquivos quentes
 
@@ -174,13 +178,14 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 |---|---|---|
 | `core/nervous_system.py` | #5, B2 (só `taxas()`); depois só o T2, na função `criar_cerebro` | Congelado depois do B2 (decisão V1) |
 | `app.py` | #5, depois só o T1 | Frente nova entra pelo registro de módulos |
-| `ajustes.py` | #5, T1; depois cada frente só na própria seção reservada, e a NE na seção de decisões | O T1 cria as seções, com marcas de início e fim, também dentro de `_LIMITES` |
+| `ajustes.py` | #5, B4 (comentários), T1; depois cada frente só na própria seção reservada, e a NE na seção de decisões | O T1 cria as seções, com marcas de início e fim, também dentro de `_LIMITES` |
 | `config.py` | T1 (chaves e permissões de todas as frentes, escondidas enquanto a chave está desligada), T2 (`CEREBROS_PRONTOS`) | Ligar por padrão é PR à parte |
 | `paths.py` | T1 | Estado novo usa a pasta por módulo |
 | `core/bio/rede.py` | T2, depois só a frente NE | As outras frentes preenchem o próprio arquivo |
-| `mind/sleep.py`, `core/episodic.py` | #5; depois T1 (`sleep.py`) e ME-1 (`episodic.py`) | O B2 não toca nenhum dos dois |
+| `mind/sleep.py`, `core/episodic.py` | #5; B4 (`sleep.py`); depois T1 (`sleep.py`) e ME-1 (`episodic.py`) | O B2 não toca nenhum dos dois. O B4 entra antes do T1 |
+| `core/homeostasis.py` | B4 (`pressao_quitada`); depois só a LAR-3 | Em série: B4 na onda 0, LAR-3 na onda 3 |
 | `core/bio/crescimento.py` | CR-1, CR-3, CR-2, nessa ordem | Em série dentro da frente |
-| `CHANGELOG.md`, `PRIVACIDADE.md`, READMEs gerados, `REDE_NEURAL.md`, spec | #5, B3, DOC-P, F | Regras 4 e 5 |
+| `CHANGELOG.md`, `PRIVACIDADE.md`, READMEs gerados, `REDE_NEURAL.md`, spec | #5, #9 e B4 (uma entrada cada, antes dos trilhos), B3, DOC-P, F | Regras 4 e 5 |
 | Testes existentes | T2 (via `conftest.py`) e a frente NE (limiares) | Regra 9 |
 
 ## 6. Portões
@@ -190,7 +195,7 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 | A | Onda 2 | #5, B2, T1 e T2 na `main`. A suíte passa nos dois cérebros. Na simulação de noites, com os mesmos cenários e 5 sementes, a taxa de cada população plástica do `BioBrain` no dia 30 fica dentro da faixa (mínimo a máximo) que o LIF produz, e nenhuma população zera |
 | B | Onda 3 | F2 na `main`. Custo do `BioBrain` medido na máquina de referência, dentro de 25% de um núcleo. PL-1 passa nos fenômenos da spec |
 | C | LI-1 | WS-1 com um vencedor por vez. PL-1 e NE-1 na `main`. O teste do tutor está escrito antes do código da linguagem |
-| D | NE-5 | NE-4 na `main` e uma semana de uso real com cada cérebro (critério "valor percebido" da spec; decisão V7) |
+| D | NE-5 | NE-4 na `main`. A suíte passa com `cerebro = "bio"` como padrão. A simulação de noites, com 5 sementes, fica dentro da linha de base vigente (regra 8) e nenhuma população zera. Sem semana de uso real: o Cantyll decidiu a V7 em 2026-11-12 |
 
 Se um portão não passa, a frente para e o resultado é registrado. Não se abre a frente seguinte para
 "adiantar".
@@ -248,11 +253,14 @@ Só contagens, taxas e pesos. Nenhum nome de programa, título ou texto (R6).
 ## 9. Fora deste plano
 
 - Gânglios da base liberando ação (spec, M4): a decisão D5 continua pendente.
-- Microfone, nível de som do sistema, voz sintetizada e sons: dependem das decisões V4 e V5 da visão.
+- Microfone: a V4 ficou em só texto escrito, e o microfone ficou em aberto para depois.
+- Nível de som do sistema: a V5 ficou em fora por enquanto. Voz sintetizada e sons seguem fora.
+- A medida do "valor percebido" da spec (uma semana de uso real com cada cérebro): a V7 tirou ela do caminho
+  da troca do padrão. Nenhum PR deste plano a faz.
 - LLM como tradutor opcional.
 - Conectoma de qualquer organismo.
 
 ## 10. Contagem
 
-39 pull requests além do #5: 24 pesados e 15 fáceis. Onda 0: 3. Onda 1: 2. Onda 2: 17. Onda 3: 8. Onda 4: 9.
+40 pull requests além do #5: 25 pesados e 15 fáceis. Onda 0: 4. Onda 1: 2. Onda 2: 17. Onda 3: 8. Onda 4: 9.
 No pico da onda 2, até 9 threads ao mesmo tempo (NE, PL, EU, ME, AC, LAR, LI, TA e documentação).
