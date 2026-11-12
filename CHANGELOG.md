@@ -11,6 +11,8 @@
 - Jorge perdeu o temperamento `LONELY->GLOOM`, porque essa ligação deixou de existir.
 - A rede tem 15808 sinapses (antes 15939, semente 7): saíram as ligações de cansaço para tristeza e para o cantinho.
 - Replay noturno (M3): ao dormir, até 50 episódios, os mais marcantes, voltam à rede por 0,5 s cada, com δ = 0,5 · δ. Cada episódio passa a guardar o nível dos sentidos naquele momento (`sentidos` em `episodes.jsonl`). Episódios antigos, sem esse dado, não entram no replay.
+- Replay e homeostase sináptica valem pela dívida de sono, não por adormecer. Antes, acordar no meio da noite (carinho, susto, o app reaberto) e dormir de novo refazia o replay de 50 episódios e mais 20% de SHY a cada vez. Agora cada sono cobra a pressão de sono que subiu desde o ponto mais baixo do último sono: uma noite de dívida vale o sono completo de antes; menos que isso vale a parte dela. Uma noite inteira, sem acordar, fica igual a antes.
+- Habituação à dispensa (decisão 9): dispensas repetidas no mesmo dia pesam cada vez menos no aprendizado (metade depois de 10 seguidas), o peso volta com o tempo (τ = 8 h) e cada carinho zera a habituação. A raiva, o drama e a memória do episódio continuam inteiros. Na simulação de 30 noites só com dispensas, a tristeza de uso cai de 2,5 para 1,8 Hz; com carinho junto, nada muda além da faixa das sementes. Desliga com `HABITUACAO_DISPENSA = 0` em `ajustes.py`.
 - Homeostase sináptica no sono (SHY, decisão D4): ao adormecer, cada sinapse aprendida perde 20%, e o replay para de empurrar uma sinapse ao chegar a 50% do seu limite. Antes, a tristeza de episódios negativos subia ao teto e ficava lá: 4,8 Hz em 30 noites de uso misto. Com a homeostase, o peso fica perto de 0,02 e a tristeza fica entre 0,2 e 1 Hz nas simulações (dias 10 a 30).
 - Problema aberto: sem homeostase, a brincadeira (PLAYFUL) cai a zero em 30 noites de uso pesado. Com a homeostase, no dia 30 ela fica em 0,87 Hz com 20 dispensas e 10 carinhos por dia, em 1,3 Hz com 5 e 3, e em 1,6 Hz com 2 e 20. São números de simulação, com learn_rate normal e habituação restaurada a cada dia; as suposições de uso não foram medidas.
 
@@ -19,6 +21,7 @@
 - Interface `Brain` com `learn` (erro de predição), `avancar`, `estado` e versão. `criar_cerebro` escolhe o cérebro pela configuração; hoje só existe `lif`.
 - `LIFBrain(seed_ruido=...)`: com semente, o ruído se repete. Sem semente, continua aleatório, como antes.
 - `drives.json` ganha `pressao`. Arquivo antigo carrega com o valor inicial (0,3).
+- `drives.json` ganha `pressao_quitada` (a pressão mais baixa do último sono). Arquivo antigo carrega sem ela, e o próximo sono vale uma noite inteira.
 
 ## 0.8.0 — melhorias para o Windows
 
