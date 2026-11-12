@@ -20,5 +20,5 @@ python ferramentas/gerar_doc_rede.py
 | `gerar_panfleto.py` | Desenha pets/jorge/bolinha_papel.png: um panfleto de mentoria amassado, que o Jorge atira na revolução. |
 | `gerar_readmes.py` | Gera pestinha/README.md e o README de cada camada a partir das docstrings dos módulos. |
 | `medir_cartazes.py` | Mede se cada frase do cartazes.txt de cada pet cabe na placa em que aparece, com as fontes de verdade. |
+| `medir_custo_izhikevich.py` | Mede o custo de um passo do M1 (Izhikevich, passo de 0,5 ms) ao lado do LIF atual, na mesma máquina. |
 | `medir_custo_passo.py` | Mede quanto custa um passo da rede, em fração de um núcleo de CPU (docs/CUSTO_DO_PASSO.md). |
-| `medir_custo_izhikevich.py` | Compara o custo de um passo com neurônios Izhikevich (M1) e com o LIF atual, na mesma rodada (docs/CUSTO_M1_IZHIKEVICH.md). |

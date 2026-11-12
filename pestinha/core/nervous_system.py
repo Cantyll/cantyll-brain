@@ -45,6 +45,7 @@ import numpy as np
 
 from ..ajustes import AUSENCIA_CORRENTE
 from ..mathutil import valor_real
+from .homeostase_sinaptica import downscaling, saturacao
 from ..store import read_json, write_json
 
 # ============================================================
@@ -327,8 +328,11 @@ class Brain(ABC):
     def definir_ausencia(self, ausente):
         """Liga ou desliga o modulador de ausência (R1). Cérebro que não tem o modulador ignora."""
 
-    def replay(self, sentidos, ms, delta, rate=0.0):
+    def replay(self, sentidos, ms, delta, rate=0.0, teto=None):
         """Replay noturno (M3): reativa o padrão sensorial por `ms` com δ = delta. Cérebro sem replay ignora."""
+
+    def downscaling_sono(self, fracao):
+        """Homeostase sináptica (SHY): o sono desfaz uma fração das sinapses aprendidas. Cérebro sem plasticidade ignora."""
 
     @abstractmethod
     def motor_activity(self):
@@ -339,10 +343,11 @@ class Brain(ABC):
         """Dados para visualização."""
 
     @abstractmethod
-    def learn(self, reward, expected, dt, rate=LEARN_RATE_PADRAO):
+    def learn(self, reward, expected, dt, rate=LEARN_RATE_PADRAO, teto=None):
         """
         Erro de predição: δ = reward - expected. dt em segundos, chamado a cada passo.
         expected = 0 significa recompensa bruta (comportamento anterior à fase M2).
+        teto: fração do limite de cada sinapse que o empurrão pode alcançar (só o replay usa).
         """
 
     @abstractmethod
@@ -586,10 +591,11 @@ class LIFBrain(Brain):
         """R1: com o usuário ausente, FUGIR e TRAVESSURA recebem corrente inibitória (AUSENCIA_CORRENTE)."""
         self.ausente = bool(ausente)
 
-    def replay(self, sentidos, ms, delta, rate=LEARN_RATE_PADRAO):
+    def replay(self, sentidos, ms, delta, rate=LEARN_RATE_PADRAO, teto=None):
         """
         Replay noturno (M3, spec seção 9.4): reativa o padrão sensorial de um episódio por `ms` milissegundos,
         com δ = delta no aprendizado. Só os canais sensoriais contam; os que faltam valem 0.
+        teto: o empurrão para de crescer quando a sinapse chega a essa fração do limite (homeostase).
         """
         entrada = {k: v for k, v in sentidos.items() if k in self.sensory_names}
         restante = int(ms)
@@ -597,8 +603,13 @@ class LIFBrain(Brain):
             chunk = min(100, restante)
             self.stimulate(entrada)
             self.step(chunk)
-            self.learn(delta, 0.0, chunk / 1000.0, rate)
+            self.learn(delta, 0.0, chunk / 1000.0, rate, teto)
             restante -= chunk
+
+    def downscaling_sono(self, fracao):
+        """Homeostase sináptica (SHY, decisão D4): o sono desfaz `fracao` de todas as sinapses aprendidas."""
+        self.learned = downscaling(self.learned, fracao)
+        self._apply_learning()
 
     def stimulate(self, intensities):
         """Recebe a intensidade (0 a 1) de cada canal sensorial e converte em probabilidade de disparo, com habituação."""
@@ -689,12 +700,13 @@ class LIFBrain(Brain):
 
     # ---------------- aprendizado ----------------
 
-    def learn(self, reward, expected, dt_s, rate=LEARN_RATE_PADRAO):
+    def learn(self, reward, expected, dt_s, rate=LEARN_RATE_PADRAO, teto=None):
         """
         Chamar a cada passo: atualiza a elegibilidade (o que estava ativo nos
         últimos segundos) e, se o erro de predição δ = reward - expected não for zero,
         ajusta as sinapses plásticas. reward: + carinho, - rejeição.
         expected = 0 mantém o comportamento anterior (recompensa bruta).
+        teto: com fração dada, o empurrão perde força perto desse limite (replay homeostático).
         """
         k = 1.0 - math.exp(-dt_s / ELIGIBILITY_TAU)
         self.eligibility += (self._levels - self.eligibility) * k
@@ -702,6 +714,8 @@ class LIFBrain(Brain):
         if delta_predicao == 0.0:
             return
         change = rate * delta_predicao * dt_s * np.outer(self.eligibility, self.post_sign)
+        if teto is not None:
+            change = change * saturacao(change, self.learned, teto, LEARN_MAX, LEARN_MIN)
         self.learned = np.clip(self.learned + change, LEARN_MIN, LEARN_MAX)
         self._apply_learning()
 

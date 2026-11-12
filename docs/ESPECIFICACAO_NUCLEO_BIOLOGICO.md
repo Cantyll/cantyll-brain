@@ -163,7 +163,7 @@ Esta é a mudança de fronteira mais importante do projeto (decisão D5). Hoje o
 Oscilador de fase φ, com frequência f = 0,25 Hz + 0,5·A. Saída: escala corporal s = 1 + 0,03·sen(φ), enviada ao `MotorTone`.
 
 ### 9.4 Replay noturno
-Durante o sono, são escolhidos 50 episódios de `episodic.py`, por prioridade de |δ| e recência. Cada episódio reativa o padrão pré-sináptico por 0,5 s, com δ_replay = 0,5 · δ registrado. `consolidate()` continua atualizando a tabela do bandit. Downscaling sináptico no sono (hipótese SHY) fica desligado (decisão D4).
+Durante o sono, são escolhidos 50 episódios de `episodic.py`, por prioridade de |δ| e recência. Cada episódio reativa o padrão pré-sináptico por 0,5 s, com δ_replay = 0,5 · δ registrado. `consolidate()` continua atualizando a tabela do bandit. Downscaling sináptico no sono (hipótese SHY) fica ligado (decisão D4, Cantyll, 2026-11-11): ao adormecer, cada sinapse aprendida perde 20% (`HOMEOSTASE_SHY`), e o replay para de empurrar uma sinapse ao chegar a 50% do seu limite (`HOMEOSTASE_TETO`). Sem isso, a tristeza de episódios negativos subia ao teto e ficava lá (medido: 4,8 Hz em 30 noites de uso misto).
 
 ### 9.5 Opcionais, fora do escopo inicial
 - Codificação esparsa tipo giro denteado (k-WTA, com k = 5%).
@@ -253,7 +253,7 @@ Cada fase entra como pull requests pequenos, validados no CI que já roda em Win
 | D1 | Neurônio padrão | Izhikevich | CAdEx só no córtex | calibração |
 | D2 | Passo de integração | 0,5 ms | 0,25 ms (mais estável, mais caro) | custo por passo |
 | D3 | Crítico do δ | V de `conditioning.py` | crítico próprio na rede | acoplamento |
-| D4 | Downscaling no sono (hipótese SHY) | desligado | ligado | ciência contestada |
+| D4 | Downscaling no sono (hipótese SHY) | ligado, decidido pelo Cantyll em 2026-11-11: −20% por sono, replay com teto de 50% do limite | desligado | ciência contestada |
 | D5 | A BG (D1 e D2) passa a liberar as ações, no lugar das regras atuais de limiar e sorteio; guardas continuam | sim, em M4 | manter as regras; a rede já compete por inibição lateral | previsibilidade (ex.: travessura) e a regra de `ARQUITETURA.md` |
 | D6 | Gatilho do sono | pressão P com relógio C | manter a energia | ritmo |
 | D7 | Saves do LIF | não convertidos; memória episódica preservada | conversão | o pet começa a rede do zero |

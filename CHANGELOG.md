@@ -11,6 +11,8 @@
 - Jorge perdeu o temperamento `LONELY->GLOOM`, porque essa ligação deixou de existir.
 - A rede tem 15808 sinapses (antes 15939, semente 7): saíram as ligações de cansaço para tristeza e para o cantinho.
 - Replay noturno (M3): ao dormir, até 50 episódios, os mais marcantes, voltam à rede por 0,5 s cada, com δ = 0,5 · δ. Cada episódio passa a guardar o nível dos sentidos naquele momento (`sentidos` em `episodes.jsonl`). Episódios antigos, sem esse dado, não entram no replay.
+- Homeostase sináptica no sono (SHY, decisão D4): ao adormecer, cada sinapse aprendida perde 20%, e o replay para de empurrar uma sinapse ao chegar a 50% do seu limite. Antes, a tristeza de episódios negativos subia ao teto e ficava lá: 4,8 Hz em 30 noites de uso misto. Com a homeostase, o peso fica perto de 0,02 e a tristeza fica entre 0,1 e 1 Hz nas simulações.
+- Problema aberto: a brincadeira (PLAYFUL) cai a zero nas simulações de 30 noites, com ou sem homeostase. O replay por |δ| traz quase só episódios negativos, e a brincadeira não se recupera sozinha.
 
 ### Novidades internas
 - Licença GPL-3.0-or-later, com o arquivo `NOTICE`.

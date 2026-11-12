@@ -160,6 +160,13 @@ REPLAY_MS = 500                 # cada episódio reativa o padrão sensorial por
 REPLAY_MS_POR_FRAME = 100       # simulação de replay por quadro, para a tela não travar
 
 # ---------------------------------------------------------------------------
+# Homeostase sináptica no sono (decisão D4, hipótese SHY; spec, seção 9.4)
+# Sem isso, o replay de episódios negativos levava a tristeza (GLOOM) ao teto e ela ficava lá.
+# ---------------------------------------------------------------------------
+HOMEOSTASE_SHY = 0.2            # cada sono desfaz essa fração das sinapses aprendidas (downscaling, uma vez por sono)
+HOMEOSTASE_TETO = 0.5           # o replay para de empurrar uma sinapse em 50% do seu limite (LEARN_MAX / LEARN_MIN)
+
+# ---------------------------------------------------------------------------
 # Validação
 # ---------------------------------------------------------------------------
 

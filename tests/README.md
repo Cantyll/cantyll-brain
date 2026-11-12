@@ -34,6 +34,7 @@ app inteiro usam um relógio virtual: avançam o tempo sem esperar.
 | `test_escolha_pet.py` | Etapa 3 do multipet: escolha do personagem nas configurações e o nome certo em cada texto. |
 | `test_festa.py` | Fogos de artifício ligados à rede e brincadeira mais animada quando feliz. |
 | `test_homeostase.py` | Homeostase: trabalhar é estímulo, então o tédio não sobe enquanto ele programa. |
+| `test_homeostase_sinaptica.py` | Homeostase sináptica no sono (decisão D4, hipótese SHY; spec, seção 9.4): o sono desfaz uma fração das sinapses aprendidas, e o replay para de empurrar uma sinapse perto do seu limite. |
 | `test_jorge.py` | Etapa 4 do multipet: o Jorge, segundo personagem, feito só de configuração e conteúdo. |
 | `test_melhorias_windows.py` | Melhorias para o Windows: tela cheia, vários monitores, pasta de dados, uma cópia só, início automático e fechamento seguro. |
 | `test_mesa.py` | Notebook: sentar e levantar pelo disparo do neurônio SENTAR. |
@@ -43,7 +44,7 @@ app inteiro usam um relógio virtual: avançam o tempo sem esperar.
 | `test_paineis.py` | Painéis do menu (monitor neural e painel de protesto): abrir à mão deve manter o painel na tela. |
 | `test_pedido.py` | Pedir para trabalhar: o neurônio SENTAR decide. |
 | `test_plataforma.py` | Plataforma: cada sistema expõe as mesmas funções, e as leituras de texto (wmctrl, xdotool, ioreg, janelas do Quartz) são testadas com saídas de exemplo, em qualquer sistema. |
-| `test_replay.py` | Replay noturno (M3): escolha dos episódios, fila no sono, orçamento por quadro e efeito na rede. |
+| `test_replay.py` | Replay noturno (M3, spec seção 9.4): os episódios mais marcantes voltam à rede durante o sono. |
 | `test_ritmo.py` | Ritmo e sono (core/ritmo.py e homeostasis.Drives): vigília de dia, sono à noite, com a pressão de sono da spec. |
 | `test_robustez.py` | Robustez: arquivo corrompido, assets faltando, log em arquivo. |
 | `test_robustez_v2.py` | Falhas do relatório técnico (docs/auditorias/ANALISE_TECNICA.md): cada caso tem um teste que reproduz o problema. |
