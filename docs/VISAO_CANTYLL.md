@@ -1,6 +1,6 @@
 # Visão: do Pestinha ao Cantyll
 
-**Versão:** 0.1 (2026-11-12)
+**Versão:** 0.2 (2026-11-12)
 **Estado:** visão e direção. Nenhum código foi alterado por este documento.
 **Relação com os outros documentos:** a [especificação do núcleo biológico](ESPECIFICACAO_NUCLEO_BIOLOGICO.md)
 continua valendo para o núcleo (fases M0 a M7, regras R1 a R7, testes de aceitação). Este documento diz
@@ -67,13 +67,25 @@ Medido no código da `main` em 2026-11-12, antes e depois do PR #5 (mesclado nes
 | Corpo e lar | Corpo na tela, bolinha, notebook, cantinho do castigo, bandeja | Um lar fixo, sentidos novos |
 | Acompanhamento | Monitor neural ao vivo (`ui/monitor.py`). Nenhum histórico | Seção 8 |
 
-Dois fatos do PR #5 que pesam sobre tudo o que vem depois:
+Dois fatos sobre a base que pesam sobre tudo o que vem depois:
 
-1. **A brincadeira (PLAYFUL) cai a zero** em 10 a 20 noites simuladas, com ou sem homeostase. O replay por
-   |δ| traz quase só episódios negativos. É um problema aberto da base.
-2. **A simulação de 30 noites não está no repositório.** Os números estão no CHANGELOG, mas ninguém consegue
-   reproduzir. Ela precisa virar ferramenta antes de qualquer troca de neurônio, porque é o único
-   instrumento de longo prazo que o projeto tem.
+1. **A queda da brincadeira (PLAYFUL) a zero, registrada no CHANGELOG, não se reproduz com o código atual.**
+   A versão 0.1 deste documento repetiu essa premissa sem conferir. Reprodução de 2026-11-12 na `main`
+   (uma semente, taxa de aprendizado normal, 20 dispensas e 10 carinhos por dia, 30 noites; simulado, não
+   medido):
+
+   | | PLAYFUL no dia 0 | PLAYFUL no dia 30 | GLOOM no dia 30 |
+   |---|---|---|---|
+   | Com a homeostase do PR #5 | 2,47 Hz | 0,87 Hz (35% do início); não zera em nenhum dia | 0,54 Hz |
+   | Sem homeostase | 2,47 Hz | zero a partir do dia 26 | 6,04 Hz |
+
+   A homeostase evita o colapso, mas a brincadeira ainda perde dois terços nessa rodada, com muita variação
+   de um dia para o outro (2,56 Hz no dia 15, 0,54 Hz no dia 27). Na ferramenta do B2 (PR #8, ainda não
+   mesclado), num cenário só de dispensas e sem carinho, quem mais cai é a calma (CALM, 32% do dia 0 no
+   dia 30), e a PLAYFUL fica em 67%. O piso por taxa-alvo, que trataria isso, foi cancelado pelo Cantyll
+   em 2026-11-12.
+2. **A simulação de noites ainda não está na `main`.** Ela entra com o B2. É o único instrumento de longo
+   prazo que o projeto tem, e precisa existir antes de qualquer troca de neurônio.
 
 ## 4. Arquitetura em seis camadas
 
@@ -201,9 +213,9 @@ Valores canônicos de Izhikevich (2003). Conferir no artigo antes de usar.
 ### 5.2 Como migrar sem quebrar
 
 1. **Cérebro novo ao lado do antigo.** `BioBrain`, em arquivos novos, escolhido por `config.CEREBRO`. O
-   `LIFBrain` fica como base de comparação (R7) e deixa de receber funções novas depois do B2 do plano (o
-   piso da brincadeira), que é a última mudança de função nele. Essa regra de congelamento é a decisão V1
-   (seção 11) e está pendente.
+   `LIFBrain` fica como base de comparação (R7) e não recebe função nova: todo trabalho novo do núcleo vai
+   para o `BioBrain` (decisão V1, aprovada pelo Cantyll em 2026-11-12). A última mudança no LIF é o que o
+   B2 mantiver depois do cancelamento do piso.
 2. **Paridade primeiro.** O `BioBrain` nasce com todas as populações em LIF, sobre projeções esparsas. Só
    passa adiante quando a suíte atual inteira roda nele.
 3. **Uma população por vez.** Cada população tem a sua dinâmica. Ordem: populações novas (workspace) já
@@ -241,7 +253,7 @@ crescimento é o orçamento de custo, não um número fixo de neurônios.
 | O que vale guardar | Neuromodulação (δ, A, ACh) | Recompensa bruta | A marca só vira mudança durável se o modulador chegar a tempo (tagging e captura) |
 | Dia | Hipocampo rápido: episódios | Só travessuras, com os sentidos do momento (PR #5) | Qualquer momento marcante: \|δ\| alto ou surpresa do modelo do eu |
 | Noite | Replay para o córtex lento | PR #5 | Replay equilibrado entre episódios bons e ruins |
-| Noite | Homeostase sináptica (SHY) | PR #5: −20% por sono, teto de 50% no replay | Piso por taxa-alvo (spec, seção 7.3), para a brincadeira não morrer |
+| Noite | Homeostase sináptica (SHY) | PR #5: −20% por sono, teto de 50% no replay | Nada por enquanto. O piso por taxa-alvo (spec, seção 7.3) foi cancelado pelo Cantyll em 2026-11-12 |
 | Semanas | Consolidação sináptica | Não | Cada sinapse ganha uma "dureza": as importantes resistem ao SHY e a aprendizados novos |
 | Sempre | Lembrar por pista parcial | Não | Assembleia que se completa a partir de um pedaço (tipo CA3; ME-3 do plano) |
 
@@ -265,10 +277,16 @@ Regras do crescimento:
 
 - **Acontece no sono.** Acordado, a rede só acumula contadores. As mudanças de estrutura são aplicadas ao
   dormir, junto com o replay e o SHY. Isso também mantém o passo acordado barato e determinístico.
-- **Teto por custo.** O crescimento para quando o passo chega ao orçamento da máquina de referência. A poda
-  é o que abre espaço. O teto fixo de 800 neurônios da spec (D9) vira um limite inicial, não o critério.
+- **Teto de 1500 neurônios** (decisão V2 do Cantyll, 2026-11-12; a spec dizia 800). A poda é o que abre
+  espaço. O teto não dispensa o orçamento de custo da spec (seção 10): se o passo chegar a 25% de um
+  núcleo na máquina de referência antes dos 1500, o crescimento para ali.
+- **O que 1500 implica, por conta e não por medida:** com matriz densa, o custo cresce com o quadrado do
+  tamanho, então 1500 neurônios custariam cerca de 5,7 vezes os 15,6% medidos para 630, perto de 90% de um
+  núcleo. Só cabe com sinapses esparsas, e precisa ser medido. Pela fórmula da spec para a pressão de sono
+  (k_w = 0,1/h × N/630), com 1500 neurônios ele precisaria dormir depois de cerca de 4,6 h acordado, contra
+  11 h hoje. A fórmula precisa ser revista antes da neurogênese (CR-2 do plano).
 - **Não é disparado por recompensa bruta** (R3).
-- **Custo biológico:** mais neurônios, mais pressão de sono (spec: k_w proporcional a N).
+- **Custo biológico:** mais neurônios, mais pressão de sono, com a fórmula revista como dito acima.
 
 ## 8. Acompanhamento
 
@@ -283,8 +301,9 @@ Regras do crescimento:
   gravados. Depois, fora do app, a mesma sequência é reaplicada a uma cópia da rede com um módulo
   desligado (sem modelo do eu, sem workspace, sem SHY). A diferença entre os gêmeos é a medida do que
   aquele módulo causa. Sem isso, um indivíduo e um usuário produzem só uma história.
-- **Simulação de noites.** A simulação de 30 noites do PR #5 vira ferramenta do repositório e critério de
-  aceitação de toda troca de neurônio ou de regra de plasticidade.
+- **Simulação de noites.** Vira ferramenta do repositório com o B2 e critério de aceitação de toda troca
+  de neurônio ou de regra de plasticidade. O critério é relativo: a mudança não pode sair da faixa que o
+  código anterior produz com várias sementes.
 
 ## 9. Onde pode estar a descoberta
 
@@ -293,7 +312,7 @@ Regras do crescimento:
 | Autoconsciência funcional surge de um modelo do eu preditivo num corpo | Os três critérios da seção 1 passam, e o gêmeo sem modelo do eu falha no terceiro | Ele parecer mais vivo |
 | Uma personalidade se forma em meses de convivência com uma pessoa | Duas cópias com a mesma semente e rotinas diferentes divergem de forma estável e mensurável | Um único indivíduo mudar com o tempo |
 | Linguagem aterrada no corpo, sem texto da internet | Compreensão e produção acima do acaso no teste do tutor, e depois com a pessoa | Ele repetir palavras |
-| SNN rodando meses ao lado de uma pessoa | Curvas diárias sem colapso nem saturação (o caso do GLOOM e da PLAYFUL é o primeiro dado) | A rede continuar ligada |
+| SNN rodando meses ao lado de uma pessoa | Curvas diárias sem colapso nem saturação (o teto do GLOOM, resolvido pela homeostase, é o primeiro dado) | A rede continuar ligada |
 
 Limite assumido: é um indivíduo com um usuário. As métricas são definidas antes de olhar os dados, e os
 gêmeos de ablação fazem o papel de controle. Resultados negativos (por exemplo, assembleias de palavras
@@ -305,23 +324,24 @@ que não se formam nesta escala) são registrados como resultado.
 |---|---|---|---|
 | D4, downscaling no sono | Desligado | Ligado | Decidido (2026-11-11), no PR #5 |
 | D1, neurônio | Izhikevich, e "M1 pode nem ser necessária" (seção 13) | Izhikevich, migração decidida | Decidido (2026-11-11) |
-| D10, onde vivem M2 a M6 | No `LIFBrain` | No `BioBrain`; o LIF congela depois do B2 do plano | **Proposto aqui, pendente de decisão do Cantyll (V1)** |
-| D9, neurogênese | Desligada, teto de 800 | Ligada por configuração, teto por custo | **Proposto aqui, pendente de decisão do Cantyll (V2)** |
-| Seção 13, ordem das fases | M0, M3, M2, M5, M6 no LIF; M1 por último | M0 e M3 no LIF (PR #5 e B2); depois paridade do `BioBrain`, M1 por população, e M2, M5, M6 nele | Consequência da D10 |
+| D10, onde vivem M2 a M6 | No `LIFBrain` | No `BioBrain`; o LIF não recebe função nova | Decidido pelo Cantyll (V1, 2026-11-12) |
+| D9, neurogênese | Desligada, teto de 800 | Ligada, com teto de 1500 neurônios | Decidido pelo Cantyll (V2, 2026-11-12) |
+| Seção 13, ordem das fases | M0, M3, M2, M5, M6 no LIF; M1 por último | M0 e M3 no LIF (PR #5); depois paridade do `BioBrain`, M1 por população, e M2, M5, M6 nele | Consequência da D10 |
 | Seções 9.5 e 16, CA3 e giro denteado | Fora de escopo | Hipocampo rápido entra (seção 6): episódios gerais (ME-1) e lembrança por pista parcial, tipo CA3 (ME-3). Giro denteado continua fora | Consequência da decisão de memória |
 | D5, gânglios da base liberam ação | Pendente | Continua pendente. O workspace não substitui essa decisão | Sem mudança |
-| Seção 7.3, escalonamento homeostático | Especificado | Vira prioridade: é o piso que falta para a PLAYFUL | Recomendado pela thread do M0 |
+| Seção 7.3, escalonamento homeostático | Especificado | Não entra. O piso por taxa-alvo foi cancelado; a premissa que o tornava urgente (PLAYFUL a zero) não se reproduziu | Decidido pelo Cantyll (2026-11-12) |
 
 A spec só é editada por um PR próprio, depois do merge do PR #5, para não conflitar com ele.
 
 ## 11. Decisões pendentes do Cantyll
 
-Cada linha tem um padrão adotado neste documento. Sem resposta, o plano segue o padrão.
+Cada linha tem um padrão adotado neste documento. Sem resposta, o plano segue o padrão. V1 e V2 já foram
+decididas.
 
 | ID | Decisão | Padrão adotado | Alternativa |
 |---|---|---|---|
-| V1 | Onde entra o trabalho novo do núcleo (D10) e quando o LIF congela | Só no `BioBrain`; o LIF congela depois do B2 (piso da brincadeira). **Pendente** | Congelar já depois do PR #5 e levar o piso direto ao `BioBrain`; ou manter as duas redes em paralelo (dobra o trabalho) |
-| V2 | Neurogênese (D9) | Ligada por configuração, teto por custo | Desligada até a sinaptogênese se provar |
+| V1 | Onde entra o trabalho novo do núcleo (D10) | **Decidido (2026-11-12):** só no `BioBrain`; o trabalho novo pode começar | Era: manter as duas redes em paralelo |
+| V2 | Neurogênese (D9) | **Decidido (2026-11-12):** ligada, com teto de 1500 neurônios | Era: teto por custo, ou desligada até a sinaptogênese se provar |
 | V3 | Fome | Ele se alimenta sozinho no lar; você alimentar é bônus | Sem fome |
 | V4 | Entrada da linguagem | Só texto escrito para ele | Microfone, com permissão própria e `PRIVACIDADE.md` novo |
 | V5 | Nível de som do sistema como sentido | Fora por enquanto | Entra, com leitura nova por sistema operacional |
@@ -330,8 +350,13 @@ Cada linha tem um padrão adotado neste documento. Sem resposta, o plano segue o
 
 ## 12. Riscos e pontos cegos
 
-- **A base ainda não é estável.** A PLAYFUL morre em 10 a 20 noites simuladas. Seis camadas em cima de uma
-  rede que perde a brincadeira em três semanas herdam o problema. Resolver isso vem antes de tudo.
+- **A base só tem evidência simulada, de uma semente.** A homeostase evita o colapso, mas a brincadeira
+  cai a 35% em 30 noites num cenário e a calma cai a 32% em outro (seção 3), e o piso que trataria isso
+  foi cancelado. Não há nenhuma semana de uso real medida. Seis camadas em cima disso herdam o que essa
+  base fizer em meses.
+- **Um número errado já circulou.** "PLAYFUL a zero" foi do CHANGELOG para este documento e daqui para o
+  plano sem ninguém rodar a simulação. Número de simulação só entra em documento com o comando que o
+  reproduz.
 - **Engenharia e pesquisa estão misturadas.** Trilhos, `BioBrain` em paridade, fotografia diária, painel e
   lar são engenharia: dá para especificar, dividir e paralelizar. Modelo do eu, workspace e linguagem são
   pesquisa: o desenho de cada passo depende do resultado do anterior. Código de pesquisa feito em paralelo

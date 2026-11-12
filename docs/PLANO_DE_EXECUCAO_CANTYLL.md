@@ -1,6 +1,6 @@
 # Plano de execução do Cantyll em pull requests
 
-**Versão:** 0.1 (2026-11-12)
+**Versão:** 0.2 (2026-11-12)
 **Para quê:** dividir a [visão do Cantyll](VISAO_CANTYLL.md) em pull requests que threads diferentes possam
 fazer ao mesmo tempo sem se atrapalhar. Diz, para cada PR: os arquivos de que ele é dono, do que depende, a
 ordem de merge e o critério de pronto.
@@ -40,7 +40,9 @@ de sair de rascunho.
 7. **Critérios relativos.** Teste de frente nova usa razão e porcentagem, como a seção 10 da spec ("cai 50%",
    "2 vezes maior"), nunca Hz absoluto. Só a frente NE mexe em limiares absolutos.
 8. **A simulação de noites é critério de aceitação** de todo PR que muda dinâmica de neurônio, plasticidade,
-   replay ou homeostase.
+   replay ou homeostase. O critério é relativo à linha de base registrada pelo B2: a taxa de cada população
+   plástica no dia 30 não sai da faixa das 5 sementes, a não ser que o PR diga por que deveria e o Cantyll
+   aceite a linha de base nova.
 9. **Testes:** cada PR cria arquivos de teste próprios (`tests/test_<frente>_*.py`). Teste existente só é
    editado pelo dono indicado.
 10. **Ramos:** `claude/<id>-<assunto>`, por exemplo `claude/t1-trilhos`. Um PR por ramo.
@@ -48,7 +50,7 @@ de sair de rascunho.
 ## 3. Mapa de dependências
 
 ```text
-ONDA 0   #5 (replay + SHY) ──► B2 (piso da brincadeira + simulação de noites) ──► B3 (spec e arquitetura)
+ONDA 0   #5 (replay + SHY) ──► B2 (simulação de noites; piso cancelado) ──► B3 (spec e arquitetura)
          B1 (este PR, só documentos)
 
 ONDA 1   T1 (trilhos do app) ──┐
@@ -77,14 +79,15 @@ ONDA 4   EU-2 ◄─ EU-1, PL-2    CR-2 ◄─ CR-1, EU-1   CR-3 ◄─ CR-1
 |---|---|---|---|---|---|
 | #5 | pesado | Replay noturno e homeostase sináptica (SHY). Mesclado em 2026-11-12 | `core/homeostase_sinaptica.py`, `core/nervous_system.py`, `core/episodic.py`, `mind/sleep.py`, `app.py`, `ajustes.py`, `CHANGELOG.md`, `PRIVACIDADE.md`, spec | nada | Testes do PR passam |
 | B1 | fácil | Visão e este plano | `docs/VISAO_CANTYLL.md`, `docs/PLANO_DE_EXECUCAO_CANTYLL.md`, `docs/README.md` | nada (não toca arquivo do #5) | Revisado pelo Cantyll |
-| B2 | pesado | Piso por taxa-alvo (spec, seção 7.3), para a PLAYFUL não cair a zero. Simulação de noites como ferramenta. `taxas()` na interface `Brain` | `core/homeostase_sinaptica.py`, `core/nervous_system.py`, `ajustes.py`, `ferramentas/simular_noites.py` (novo), `tests/test_simulacao_noites.py` (novo) | #5 | Em 30 noites simuladas com semente fixa, PLAYFUL não zera e GLOOM fica abaixo do teto; qualquer pessoa reproduz com um comando |
+| B2 | pesado | Simulação de noites como ferramenta e `taxas()` na interface `Brain`. **O piso por taxa-alvo foi cancelado pelo Cantyll em 2026-11-12.** É o PR #8; o que mais ele mantém se decide lá | `core/homeostase_sinaptica.py`, `core/nervous_system.py`, `mind/sleep.py`, `ajustes.py`, `ferramentas/simular_noites.py` (novo), `tests/test_simulacao_noites.py` (novo), `tests/test_homeostase_sinaptica.py` | #5 | Um comando reproduz as 30 noites com semente fixa. A linha de base do LIF fica registrada: taxa de cada população plástica no dia 30, por cenário, com 5 sementes |
 | B3 | fácil | Spec e arquitetura alinhadas com a visão: D9, D10, seções 13 e 16; R1 a R7 em `ARQUITETURA.md` | `docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md`, `docs/ARQUITETURA.md` | #5 e as decisões V1 e V2 da visão | Tabela da seção 10 da visão refletida na spec |
 
-B2 é a última mudança de função no `LIFBrain`. Fica melhor na mesma thread do #5, que já é dona desses
-arquivos. Depois dele, `core/nervous_system.py` congela (só correção de bug). **Essa regra de congelamento é
-a decisão V1 da visão e está pendente de decisão do Cantyll.** Enquanto ela não sai, o plano segue este
-padrão; se o Cantyll preferir congelar já depois do #5, o piso do B2 passa a nascer no `BioBrain`, dentro
-do T2.
+B2 é a última mudança no `LIFBrain`. Depois dele, `core/nervous_system.py` congela (só correção de bug), e
+todo trabalho novo do núcleo vai para o `BioBrain` (decisão V1, aprovada pelo Cantyll em 2026-11-12).
+
+**Correção da versão 0.1:** o plano dizia que o B2 existia "para a PLAYFUL não cair a zero". Essa queda não
+se reproduz com o código atual (visão, seção 3): com a homeostase do PR #5, a PLAYFUL vai de 2,47 Hz para
+0,87 Hz em 30 noites e não zera.
 
 ### Onda 1: trilhos
 
@@ -92,8 +95,8 @@ Dois PRs desenvolvidos em paralelo, com arquivos disjuntos. Merge: T1, depois T2
 
 | ID | Rótulo | Conteúdo | Arquivos de que é dono | Depende de | Pronto quando |
 |---|---|---|---|---|---|
-| T1 | pesado | Trilhos do app: registro de módulos com pontos de encaixe fixos, chaves de configuração por frente, pasta de estado por módulo, seções reservadas | `core/modulos.py` (novo), `app.py`, `controle/sessao.py`, `mind/sleep.py`, `config.py`, `paths.py`, `ajustes.py`, `ferramentas/gerar_readmes.py`, `tests/test_modulos.py` (novo) | #5, B2 | Com todas as chaves desligadas, a suíte passa sem nenhum teste alterado e, com semente fixa, as taxas motoras são idênticas às de antes. Um módulo de teste recebe todos os encaixes na ordem |
-| T2 | pesado | `BioBrain` em paridade: populações com dinâmica própria (todas em LIF nesta fase), projeções esparsas, e os arquivos vazios de cada frente com a interface já definida | `core/bio/` (pacote novo): `rede.py`, `neuronios.py`, `projecoes.py`, e vazios `plasticidade.py`, `moduladores.py`, `consolidacao.py`, `assembleias.py`, `crescimento.py`, `workspace.py`, `talamo.py`, `spec_base.py`, `spec_corpo.py`, `spec_eu.py`, `spec_workspace.py`, `spec_linguagem.py`. Mais: `criar_cerebro` em `core/nervous_system.py`, `CEREBROS_PRONTOS` em `config.py`, `conftest.py`, `.github/workflows/testes.yml`, `tests/test_bio_paridade.py`, `ferramentas/medir_custo_bio.py` | #5, B2 | A suíte inteira passa com `cerebro = "bio"`. Taxas por população dentro da variação entre sementes do LIF. Ida e volta de salvar e carregar determinística. Simulação de noites equivalente. Custo de 630 neurônios não maior que o denso |
+| T1 | pesado | Trilhos do app: registro de módulos com pontos de encaixe fixos, chaves de configuração por frente, pasta de estado por módulo, seções reservadas | `core/modulos.py` (novo), `app.py`, `controle/sessao.py`, `mind/sleep.py`, `config.py`, `paths.py`, `ajustes.py`, `ferramentas/gerar_readmes.py`, `tests/test_modulos.py` (novo) | #5, B2. Parte da `main` depois do merge do B2, que mexe em `mind/sleep.py` | Com todas as chaves desligadas, a suíte passa sem nenhum teste alterado e, com semente fixa, as taxas motoras são idênticas às de antes. Um módulo de teste recebe todos os encaixes na ordem |
+| T2 | pesado | `BioBrain` em paridade: populações com dinâmica própria (todas em LIF nesta fase), projeções esparsas, e os arquivos vazios de cada frente com a interface já definida | `core/bio/` (pacote novo): `rede.py`, `neuronios.py`, `projecoes.py`, e vazios `plasticidade.py`, `moduladores.py`, `consolidacao.py`, `assembleias.py`, `crescimento.py`, `workspace.py`, `talamo.py`, `spec_base.py`, `spec_corpo.py`, `spec_eu.py`, `spec_workspace.py`, `spec_linguagem.py`. Mais: `criar_cerebro` em `core/nervous_system.py`, `CEREBROS_PRONTOS` em `config.py`, `conftest.py`, `.github/workflows/testes.yml`, `tests/test_bio_paridade.py`, `ferramentas/medir_custo_bio.py` | #5, B2 | O `BioBrain` implementa a interface `Brain` inteira como ela estiver na `main` depois do B2 (`taxas()`, replay, SHY e o que mais o B2 deixar). A suíte inteira passa com `cerebro = "bio"`. Taxas por população dentro da variação entre sementes do LIF. Ida e volta de salvar e carregar determinística. Simulação de noites dentro da faixa da linha de base do LIF. Custo de 630 neurônios não maior que o denso |
 
 **Contrato dos módulos (proposta; o T1 fecha).** Quem começar uma frente antes do merge do T1 programa contra isto:
 
@@ -156,7 +159,7 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 | ID | Rótulo | Conteúdo | Arquivos de que é dono | Depende de | Pronto quando |
 |---|---|---|---|---|---|
 | EU-2 | pesado | Erro do modelo do eu ligado ao núcleo: surpresa sobe A e ACh; tédio vem do erro baixo | `core/modelo_eu.py`, `core/bio/spec_eu.py` | EU-1, PL-2 | Gêmeo sem modelo do eu tem distribuição de ações diferente |
-| CR-2 | pesado | Neurogênese com maturação e teto por custo; número de neurônios variável no estado salvo e no monitor | `core/bio/crescimento.py`, `ui/monitor.py` | CR-1, EU-1, decisão V2 | Neurônio novo só sobrevive se recrutado; teto respeitado |
+| CR-2 | pesado | Neurogênese com maturação e teto de 1500 neurônios (decisão V2); número de neurônios variável no estado salvo e no monitor; fórmula da pressão de sono revista para o tamanho novo | `core/bio/crescimento.py`, `ui/monitor.py` | CR-1, EU-1 | Neurônio novo só sobrevive se recrutado; teto de 1500 respeitado; custo medido com 1500 na máquina de referência, dentro de 25% de um núcleo, ou o crescimento para antes; ele não passa a dormir mais por ter crescido |
 | CR-3 | fácil | Plasticidade que diminui de forma contínua por população | `core/bio/crescimento.py` | CR-1 | Curva contínua, sem degrau; aparece na fotografia diária |
 | LI-1 | pesado | Texto em pulsos e assembleias de palavras por STDP | `core/linguagem/` (pacote novo), `core/bio/spec_linguagem.py` | PL-1, NE-1 | Teste do tutor: reconhecimento acima do acaso |
 | LI-2 | pesado | Aterramento: palavra ligada ao estado do corpo | `core/linguagem/` | LI-1, WS-1 | Compreensão acima do acaso |
@@ -169,13 +172,13 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 
 | Arquivo | Quem pode editar | Regra |
 |---|---|---|
-| `core/nervous_system.py` | #5, B2; depois só o T2, na função `criar_cerebro` | Congelado depois do B2 (pendente: decisão V1) |
+| `core/nervous_system.py` | #5, B2; depois só o T2, na função `criar_cerebro` | Congelado depois do B2 (decisão V1) |
 | `app.py` | #5, depois só o T1 | Frente nova entra pelo registro de módulos |
 | `ajustes.py` | #5, B2, T1; depois cada frente só na própria seção reservada, e a NE na seção de decisões | O T1 cria as seções, com marcas de início e fim, também dentro de `_LIMITES` |
 | `config.py` | T1 (chaves e permissões de todas as frentes, escondidas enquanto a chave está desligada), T2 (`CEREBROS_PRONTOS`) | Ligar por padrão é PR à parte |
 | `paths.py` | T1 | Estado novo usa a pasta por módulo |
 | `core/bio/rede.py` | T2, depois só a frente NE | As outras frentes preenchem o próprio arquivo |
-| `mind/sleep.py`, `core/episodic.py` | #5; depois T1 (`sleep.py`) e ME-1 (`episodic.py`) | |
+| `mind/sleep.py`, `core/episodic.py` | #5, B2 (`sleep.py`); depois T1 (`sleep.py`) e ME-1 (`episodic.py`) | O T1 só começa em `sleep.py` depois do merge do B2 |
 | `core/bio/crescimento.py` | CR-1, CR-3, CR-2, nessa ordem | Em série dentro da frente |
 | `CHANGELOG.md`, `PRIVACIDADE.md`, READMEs gerados, `REDE_NEURAL.md`, spec | #5, B3, DOC-P, F | Regras 4 e 5 |
 | Testes existentes | T2 (via `conftest.py`) e a frente NE (limiares) | Regra 9 |
@@ -184,7 +187,7 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 
 | Portão | Antes de | Condição |
 |---|---|---|
-| A | Onda 2 | #5, B2, T1 e T2 na `main`. A PLAYFUL sobrevive a 30 noites simuladas. A suíte passa nos dois cérebros |
+| A | Onda 2 | #5, B2, T1 e T2 na `main`. A suíte passa nos dois cérebros. Na simulação de noites, com os mesmos cenários e 5 sementes, a taxa de cada população plástica do `BioBrain` no dia 30 fica dentro da faixa (mínimo a máximo) que o LIF produz, e nenhuma população zera |
 | B | Onda 3 | F2 na `main`. Custo do `BioBrain` medido na máquina de referência, dentro de 25% de um núcleo. PL-1 passa nos fenômenos da spec |
 | C | LI-1 | WS-1 com um vencedor por vez. PL-1 e NE-1 na `main`. O teste do tutor está escrito antes do código da linguagem |
 | D | NE-5 | NE-4 na `main` e uma semana de uso real com cada cérebro (critério "valor percebido" da spec; decisão V7) |
