@@ -101,9 +101,9 @@ Cada `Projecao` tem: populações de origem e destino, lista de sinapses (índic
 - **Fim do sinal fixo por população** (`PLASTIC_POSTS`). O sinal passa a vir do receptor.
 
 ### 7.3 Escalonamento homeostático
-Cada população teria uma taxa-alvo r*, em Hz por neurônio. A cada hora acordado, e também durante o sono, os pesos de entrada seriam escalados em até ±5% por ajuste. **Esta seção não é implementável como está escrita, e será reescrita depois do B2:** (a) r* seria a taxa medida na fase M1, mas o B2 roda antes do M1, no LIF, então o B2 tem de definir de onde sai r*; (b) o texto não diz se o ajuste escala `learned` (30 canais × 4 populações, a única parte plástica do LIF), `W_base` ou outra coisa, nem o que significa ±5%.
+Cada população teria uma taxa-alvo r*, em Hz por neurônio. A cada hora acordado, e também durante o sono, os pesos de entrada seriam escalados em até ±5% por ajuste. **Cancelado pelo Cantyll em 2026-11-12: o piso por taxa-alvo não será implementado.** O desenho acima fica só como registro. Ele não estava completo: (a) r* seria a taxa medida na fase M1, mas o B2 roda antes do M1, no LIF, então o B2 tem de definir de onde sai r*; (b) o texto não diz se o ajuste escala `learned` (30 canais × 4 populações, a única parte plástica do LIF), `W_base` ou outra coisa, nem o que significa ±5%.
 
-**Prioridade (visão, seção 10):** a visão pôs o piso como prioridade porque a simulação antiga mostrava a PLAYFUL a zero. Na reprodução de 2026-11-12 (seção 9.4), ela não zera com a homeostase atual: vai de 2,47 Hz no dia 0 para 0,87 Hz no dia 30. Se o piso ainda é necessário, e para manter a PLAYFUL acima de quanto, é decisão pendente do Cantyll. O PR #8 (B2, não mesclado) põe o piso como rede de segurança para um cenário sem carinho, em que quem cai é a CALM, não a PLAYFUL. Esses números são do PR #8 e não estão reproduzidos aqui. O CHANGELOG da `main` ainda registra a queda a zero como problema aberto; a correção aguarda o Cantyll. **Pendente do B2 do plano:** o piso por taxa-alvo ainda não está no código. Esta seção não está implementada; na main há só o downscaling do sono e o teto do replay (seção 9.4).
+**Prioridade (visão, seção 10): cancelada.** A visão pôs o piso como prioridade porque a simulação antiga mostrava a PLAYFUL a zero. Na reprodução de 2026-11-12 (seção 9.4), ela não zera com a homeostase atual: vai de 2,47 Hz no dia 0 para 0,87 Hz no dia 30. Com o piso cancelado, a PLAYFUL segue sem piso. O PR #8 (B2, não mesclado) relata que, num cenário sem carinho, quem cai é a CALM, não a PLAYFUL; esses números são dele e não estão reproduzidos aqui. Sem piso, esse cenário fica sem contenção. O CHANGELOG da `main` ainda registra a queda a zero como problema aberto; a correção aguarda o Cantyll. O piso por taxa-alvo não está no código e não entra. Na main há só o downscaling do sono e o teto do replay (seção 9.4).
 
 ### 7.4 Acetilcolina
 Taxa de aprendizado efetiva: η_eff = η · (0,5 + ACh).
@@ -116,7 +116,7 @@ Aplicadas ao dormir, junto com o replay e o SHY. Acordado, a rede só acumula co
 
 ### 7.6 Neurogênese (fase M7, opcional; decisão D9)
 - **Gatilho:** erro persistente em contexto novo (novidade) e pool saturado, com taxa média acima de 0,8 do máximo.
-- **Teto:** 800 neurônios, como limite inicial. A visão (seção 7) propõe teto por custo, pendente da V2 (ver D9). Como a sinaptogênese, a mudança é aplicada ao dormir.
+- **Teto:** 1500 neurônios, decidido pelo Cantyll em 2026-11-12 (V2, ver D9). Como a sinaptogênese, a mudança é aplicada ao dormir.
 - **Entrada:** o neurônio novo recebe sinapses de parceiros co-ativos, com peso de saída pequeno (0,2 vez a média) e uma janela de maturação de 48 h de uso acordado. Durante a maturação, ele é mais excitável e mais plástico.
 - **Morte:** se não atingir taxa mínima ao fim da maturação, é removido.
 - **Custo:** a pressão de sono cresce mais rápido com mais neurônios. Fórmula: k_w = 0,1/h × (N / 630).
@@ -204,8 +204,8 @@ Os critérios são valores iniciais, para calibrar. A simulação de 30 noites �
 | Respiração | 60 s parado, com A fixo | frequência ≈ 0,25 Hz; amplitude estável |
 | Retenção (M6) | aprende um padrão; faz 5 aprendizados novos; testa o primeiro | ≥ 80% de reprodução |
 | Sinaptogênese e poda (M6, pendente, CR-1) | limite de grau e custo do passo | grau no máximo o dobro do inicial; custo dentro do orçamento; sinapse nova só com δ médio positivo (R3) |
-| Neurogênese (M7, pendente da V2 e do CR-2) | neurônios novos com maturação | neurônio novo sobrevive só se for recrutado; teto respeitado |
-| Piso por taxa-alvo e simulação de 30 noites (pendente, B2) | `ferramentas/simular_noites.py`, com semente fixa | PLAYFUL no dia 30 ≥ [fração a definir] do dia 1; GLOOM no dia 30 ≤ [valor a definir] Hz, ou ≤ [fração a definir] do valor sem homeostase (referência a ser refeita pelo B2, seção 9.4); um comando reproduz o resultado. **Os números são decisão pendente do Cantyll. Sem eles, o B2 não tem critério de aceitação** |
+| Neurogênese (M7, V2 decidida: teto de 1500; CR-2) | neurônios novos com maturação | neurônio novo sobrevive só se for recrutado; teto respeitado |
+| Simulação de 30 noites (B2; piso cancelado em 2026-11-12) | `ferramentas/simular_noites.py`, com semente fixa | GLOOM no dia 30 ≤ [valor a definir] Hz, ou ≤ [fração a definir] do valor sem homeostase (referência a ser refeita pelo B2, seção 9.4); um comando reproduz o resultado. O critério da PLAYFUL sai com o piso. **Os números do GLOOM são decisão pendente do Cantyll. Sem eles, o B2 não tem critério de aceitação** |
 | Hipocampo: episódio sem travessura entra no replay (pendente, ME-1) | replay com episódios de qualquer momento marcante | o replay não colapsa para só episódios negativos |
 | Lembrança por pista parcial (pendente, ME-3) | metade do padrão como pista, em assembleia recorrente | a assembleia reativa o resto acima do acaso; padrões diferentes não se misturam |
 | Determinismo | save → load → step, com semente fixa | spikes idênticos |
@@ -231,10 +231,10 @@ Os critérios são valores iniciais, para calibrar. A simulação de 30 noites �
 
 ## 12. Arquivos afetados
 
-Ordem vigente (seção 13): M2 a M6 podem ser feitas no `LIFBrain` antes de existir o `BioBrain`, que só é necessário para M1 (decisão D10, vigente). **Se a V1 for aprovada** (visão, seção 10), M2, M5 e M6 entram no `BioBrain` depois da paridade, e o `LIFBrain` congela depois do B2. Essa parte depende da V1, que está pendente. O que já está na main aparece marcado como feito.
+Ordem decidida (V1, aprovada pelo Cantyll em 2026-11-12; D10): o trabalho novo do núcleo vai só no `BioBrain`. M2, M5 e M6 entram nele depois da paridade (T2), e o `LIFBrain` congela depois do B2. O padrão do código segue `LIFBrain` até a V7 (uma semana de uso real, pendente). O que já está na main aparece marcado como feito.
 
 - `pestinha/core/bio/` (pacote novo, T2 do plano): `BioBrain(Brain)` e `Pool` em `rede.py`; `Neuronio` em `neuronios.py`; `Projecao` em `projecoes.py`; `Neuromod` em `moduladores.py`; `PortaTalamica` em `talamo.py`. `Estriado` espera a D5 (M4). `Respiracao` vai para `core/respiracao.py` (TA-1 do plano).
-- `pestinha/core/nervous_system.py`: feito até o PR #5. `Brain` tem `estado()` (M0), `replay()` e `downscaling_sono()` (PR #5), e `learn` aceita `teto` (PR #5). Pendente: B2 (acrescenta `taxas()` à interface `Brain`) e T2 (mexe em `criar_cerebro`). `LIFBrain` fica como base de comparação.
+- `pestinha/core/nervous_system.py`: feito até o PR #5. `Brain` tem `estado()` (M0), `replay()` e `downscaling_sono()` (PR #5), e `learn` aceita `teto` (PR #5). Pendente: B2 (acrescenta `taxas()` à interface `Brain`) e T2 (mexe em `criar_cerebro`). `LIFBrain` congela depois do B2 e fica como base de comparação.
 - `pestinha/core/homeostase_sinaptica.py`: feito no PR #5. `downscaling` e `saturacao`, funções puras sobre a matriz de sinapses aprendidas.
 - `pestinha/core/conditioning.py`: expõe o V esperado do cue ativo.
 - `pestinha/core/episodic.py`: feito no PR #5. `escolher_replay()` (seleção por |valência| vezes recência) e o campo `sentidos` em cada episódio.
@@ -264,13 +264,13 @@ Cada fase entra como pull requests pequenos, validados no CI que já roda em Win
 | M4 | Gânglios da base (D1 e D2) e guardas | alto | a seleção surge do balanço D1 e D2; guardas vetam tela cheia | Pendente da D5. Fora do plano |
 | M5 | Porta talâmica, via rápida de susto e respiração | médio | testes de porta, via rápida e respiração passam | Não começou. Plano: TA-1 e TA-2 |
 | M6 | Sinaptogênese, poda, teste de retenção e atualização de `PRIVACIDADE.md` | médio-alto | retenção ≥ 80% após 5 aprendizados novos | Não começou. Plano: CR-1, ME-2 e DOC-P3 (`PRIVACIDADE.md` antes do CR-1) |
-| M7 | Neurogênese com maturação e teto (opcional) | alto | neurônios novos sobrevivem só quando recrutados; teto respeitado | Pendente da V2. Plano: CR-2 |
+| M7 | Neurogênese com maturação e teto (opcional) | alto | neurônios novos sobrevivem só quando recrutados; teto respeitado | V2 decidida (teto de 1500). Plano: CR-2 |
 
-Os PRs do plano citados na coluna Estado que moram em `core/bio/` (TA-2, CR-1, ME-2 e CR-2) supõem a V1. TA-1 (`core/respiracao.py`) e DOC-P3 (`PRIVACIDADE.md`) não. CR-3 (plasticidade que diminui por população, `core/bio/crescimento.py`) não é sinaptogênese, por isso não entra no M6, e também supõe a V1.
+Os PRs do plano citados na coluna Estado que moram em `core/bio/` (TA-2, CR-1, ME-2 e CR-2) seguem a V1, aprovada. TA-1 (`core/respiracao.py`) e DOC-P3 (`PRIVACIDADE.md`) não dependem dela. CR-3 (plasticidade que diminui por população, `core/bio/crescimento.py`) não é sinaptogênese, por isso não entra no M6; também fica em `core/bio/`.
 
-**Ordem vigente:** M0 e M3 já estão no LIF. M2, M5 e M6 vêm depois, no `LIFBrain` atual, como a D10 registra. M3 vem antes de M1 porque `sleep.py`, `homeostasis.py` e `episodic.py` não referenciam o modelo de neurônio, e M3 é o que a pessoa percebe primeiro. Só M1 troca o neurônio, e a migração para Izhikevich está decidida (2026-11-11), camada por camada. A V1 decide onde moram M2, M5 e M6, não se o M1 acontece. M4 exige aprovação da D5. M7 depende da V2 e fica fora do plano inicial.
+**Ordem vigente (na main):** M0 e M3 já estão no LIF. M3 vem antes de M1 porque `sleep.py`, `homeostasis.py` e `episodic.py` não referenciam o modelo de neurônio, e M3 é o que a pessoa percebe primeiro. Só M1 troca o neurônio, e a migração para Izhikevich está decidida (2026-11-11), camada por camada. M4 exige aprovação da D5. M7 é opcional e fica fora do plano inicial.
 
-**Ordem da visão, se a V1 for aprovada** (visão, seção 10; pendente): M0 e M3 no LIF; depois a paridade do `BioBrain` (T2), M1 por população (NE-1 a NE-4), e só então M2, M5 e M6 no `BioBrain`. Nesse caso, o `LIFBrain` congela depois do B2.
+**Ordem decidida (V1, 2026-11-12):** M0 e M3 no LIF; depois a paridade do `BioBrain` (T2), M1 por população (NE-1 a NE-4), e só então M2, M5 e M6 no `BioBrain`. O `LIFBrain` congela depois do B2.
 
 Os códigos T, NE, PL, TA, CR e ME são os do `PLANO_DE_EXECUCAO_CANTYLL.md`.
 
@@ -286,8 +286,8 @@ Os códigos T, NE, PL, TA, CR e ME são os do `PLANO_DE_EXECUCAO_CANTYLL.md`.
 | D6 | Gatilho do sono | pressão P com relógio C | manter a energia | ritmo |
 | D7 | Saves do LIF | não convertidos; memória episódica preservada | conversão | o pet começa a rede do zero |
 | D8 | Pico circadiano | configurável por pet; 16 h (padrão, `bryan` e `jorge`; o exemplo original era 23 h) | fixo | personalização |
-| D9 | Neurogênese | desligada por padrão; teto de 800 (vigente). Pendente, V2 da visão: ligada por configuração, com teto por custo | ligada desde o início | risco de inchaço |
-| D10 | Onde vivem M2 a M6 | no `LIFBrain` atual (vigente). Pendente, V1 (visão, seção 11; plano, seção 4): no `BioBrain`, com o `LIFBrain` congelado depois do B2 | no `BioBrain`, junto com M1 | evita refazer a calibração duas vezes |
+| D9 | Neurogênese | ligada por configuração, com teto de 1500 neurônios (decidido pelo Cantyll em 2026-11-12, V2). Ainda não existe na main | ligada desde o início | risco de inchaço |
+| D10 | Onde vivem M2 a M6 | no `BioBrain`, com o `LIFBrain` congelado depois do B2 (decidido pelo Cantyll em 2026-11-12, V1). O padrão do código segue `LIFBrain` até a V7 (pendente) | no `LIFBrain` atual, como estava | evita refazer a calibração duas vezes |
 
 D5 muda a fronteira do projeto. Hoje a rede dá a tendência, e as regras escolhem as opções e a execução (`ARQUITETURA.md`). Precisa de aprovação explícita antes de M4.
 
