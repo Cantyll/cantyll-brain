@@ -7,6 +7,7 @@ Rodar: python -m pytest tests/test_habituacao_dispensa.py -q
 Só os rápidos: python -m pytest tests/test_habituacao_dispensa.py -q -k "not trinta_noites"
 """
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -198,3 +199,41 @@ def test_trinta_noites_so_dispensas_ensinam_menos_tristeza(trinta_noites_duro):
     assert com[-1]["uso_hz"]["GLOOM"] < 0.8 * sem[-1]["uso_hz"]["GLOOM"]
     assert com[-1]["peso_gloom_max"] < sem[-1]["peso_gloom_max"]
     assert com[-1]["uso_hz"]["GLOOM"] > 0                  # ele ainda aprende a ficar triste: não é anestesia
+
+
+# ---------------- validação com sementes novas (fora das usadas para escolher os números) ----------------
+# Os números padrão foram escolhidos com as sementes 3 a 7. Este teste roda o mesmo critério em sementes
+# que não entraram na escolha. São 30 simulações de 30 noites (uns 8 min), por isso só roda com
+# CANTYLL_SIMULACAO_LONGA=1:  CANTYLL_SIMULACAO_LONGA=1 python -m pytest tests/test_habituacao_dispensa.py -k sementes_novas -s
+
+SEMENTES_NOVAS = (8, 9, 10, 11, 12)
+PLASTICAS = ("PLAYFUL", "CALM", "FRUSTRATION", "GLOOM")
+
+
+@pytest.mark.skipif(os.environ.get("CANTYLL_SIMULACAO_LONGA") != "1",
+                    reason="simulação longa: defina CANTYLL_SIMULACAO_LONGA=1")
+def test_sementes_novas_mesmo_criterio_nos_tres_cenarios():
+    """
+    Critério (regra 8, relativo), em sementes novas: no duro, a GLOOM com habituação fica toda abaixo da
+    faixa da linha de base (habituação desligada); no misto e no carinhoso, a média de cada população
+    plástica fica dentro da faixa da linha de base.
+    """
+    def uso(cenario, semente, **trocas):
+        return simular_noites.simular(cenario, noites=30, semente=semente, dias=(0, 30), **trocas)[-1]["uso_hz"]
+
+    falhas = []
+    for cenario in ("duro", "misto", "carinhoso"):
+        base = [uso(cenario, s, HABITUACAO_DISPENSA=0.0) for s in SEMENTES_NOVAS]
+        nova = [uso(cenario, s) for s in SEMENTES_NOVAS]
+        for pop in PLASTICAS:
+            b = [u[pop] for u in base]
+            n = [u[pop] for u in nova]
+            media = sum(n) / len(n)
+            print(f"{cenario:9s} {pop:11s} base {sum(b) / len(b):6.2f} ({min(b):.2f} a {max(b):.2f})  "
+                  f"habituação {media:6.2f} ({min(n):.2f} a {max(n):.2f})")
+            if cenario == "duro":
+                if pop == "GLOOM" and not max(n) < min(b):
+                    falhas.append(f"duro GLOOM: {max(n):.2f} não fica abaixo de {min(b):.2f}")
+            elif not min(b) - 1e-9 <= media <= max(b) + 1e-9:
+                falhas.append(f"{cenario} {pop}: média {media:.2f} fora de [{min(b):.2f}, {max(b):.2f}]")
+    assert falhas == []
