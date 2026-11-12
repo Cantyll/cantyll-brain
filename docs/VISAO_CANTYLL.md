@@ -49,7 +49,7 @@ Consequências diretas para a visão:
 
 ## 3. Ponto de partida: o que existe hoje
 
-Medido no código da `main` em 2026-11-12 e no PR #5 (aberto).
+Medido no código da `main` em 2026-11-12, antes e depois do PR #5 (mesclado nesse dia).
 
 | Pilar da visão | Hoje | Distância |
 |---|---|---|
@@ -201,7 +201,9 @@ Valores canônicos de Izhikevich (2003). Conferir no artigo antes de usar.
 ### 5.2 Como migrar sem quebrar
 
 1. **Cérebro novo ao lado do antigo.** `BioBrain`, em arquivos novos, escolhido por `config.CEREBRO`. O
-   `LIFBrain` fica como base de comparação (R7) e deixa de receber funções novas depois do PR #5.
+   `LIFBrain` fica como base de comparação (R7) e deixa de receber funções novas depois do B2 do plano (o
+   piso da brincadeira), que é a última mudança de função nele. Essa regra de congelamento é a decisão V1
+   (seção 11) e está pendente.
 2. **Paridade primeiro.** O `BioBrain` nasce com todas as populações em LIF, sobre projeções esparsas. Só
    passa adiante quando a suíte atual inteira roda nele.
 3. **Uma população por vez.** Cada população tem a sua dinâmica. Ordem: populações novas (workspace) já
@@ -241,7 +243,7 @@ crescimento é o orçamento de custo, não um número fixo de neurônios.
 | Noite | Replay para o córtex lento | PR #5 | Replay equilibrado entre episódios bons e ruins |
 | Noite | Homeostase sináptica (SHY) | PR #5: −20% por sono, teto de 50% no replay | Piso por taxa-alvo (spec, seção 7.3), para a brincadeira não morrer |
 | Semanas | Consolidação sináptica | Não | Cada sinapse ganha uma "dureza": as importantes resistem ao SHY e a aprendizados novos |
-| Sempre | Lembrar por pista parcial | Não | Assembleia que se completa a partir de um pedaço |
+| Sempre | Lembrar por pista parcial | Não | Assembleia que se completa a partir de um pedaço (tipo CA3; ME-3 do plano) |
 
 Arquitetura em três partes: **hipocampo** (rápido, episódios do dia), **córtex** (lento, os pesos da rede)
 e **sono** (replay, captura, downscaling, consolidação). O teste que fecha o conjunto é o de retenção da
@@ -303,10 +305,10 @@ que não se formam nesta escala) são registrados como resultado.
 |---|---|---|---|
 | D4, downscaling no sono | Desligado | Ligado | Decidido (2026-11-11), no PR #5 |
 | D1, neurônio | Izhikevich, e "M1 pode nem ser necessária" (seção 13) | Izhikevich, migração decidida | Decidido (2026-11-11) |
-| D10, onde vivem M2 a M6 | No `LIFBrain` | No `BioBrain`; o LIF congela depois do PR #5 | **Proposto aqui, pede confirmação** |
-| D9, neurogênese | Desligada, teto de 800 | Ligada por configuração, teto por custo | **Proposto aqui, pede confirmação** |
-| Seção 13, ordem das fases | M0, M3, M2, M5, M6 no LIF; M1 por último | M0 e M3 no LIF (PR #5); depois paridade do `BioBrain`, M1 por população, e M2, M5, M6 nele | Consequência da D10 |
-| Seções 9.5 e 16, CA3 e giro denteado | Fora de escopo | Hipocampo rápido entra (seção 6) | Consequência da decisão de memória |
+| D10, onde vivem M2 a M6 | No `LIFBrain` | No `BioBrain`; o LIF congela depois do B2 do plano | **Proposto aqui, pendente de decisão do Cantyll (V1)** |
+| D9, neurogênese | Desligada, teto de 800 | Ligada por configuração, teto por custo | **Proposto aqui, pendente de decisão do Cantyll (V2)** |
+| Seção 13, ordem das fases | M0, M3, M2, M5, M6 no LIF; M1 por último | M0 e M3 no LIF (PR #5 e B2); depois paridade do `BioBrain`, M1 por população, e M2, M5, M6 nele | Consequência da D10 |
+| Seções 9.5 e 16, CA3 e giro denteado | Fora de escopo | Hipocampo rápido entra (seção 6): episódios gerais (ME-1) e lembrança por pista parcial, tipo CA3 (ME-3). Giro denteado continua fora | Consequência da decisão de memória |
 | D5, gânglios da base liberam ação | Pendente | Continua pendente. O workspace não substitui essa decisão | Sem mudança |
 | Seção 7.3, escalonamento homeostático | Especificado | Vira prioridade: é o piso que falta para a PLAYFUL | Recomendado pela thread do M0 |
 
@@ -318,7 +320,7 @@ Cada linha tem um padrão adotado neste documento. Sem resposta, o plano segue o
 
 | ID | Decisão | Padrão adotado | Alternativa |
 |---|---|---|---|
-| V1 | Onde entra o trabalho novo do núcleo (D10) | Só no `BioBrain`; LIF congelado depois do PR #5 | Manter as duas redes em paralelo (dobra o trabalho) |
+| V1 | Onde entra o trabalho novo do núcleo (D10) e quando o LIF congela | Só no `BioBrain`; o LIF congela depois do B2 (piso da brincadeira). **Pendente** | Congelar já depois do PR #5 e levar o piso direto ao `BioBrain`; ou manter as duas redes em paralelo (dobra o trabalho) |
 | V2 | Neurogênese (D9) | Ligada por configuração, teto por custo | Desligada até a sinaptogênese se provar |
 | V3 | Fome | Ele se alimenta sozinho no lar; você alimentar é bônus | Sem fome |
 | V4 | Entrada da linguagem | Só texto escrito para ele | Microfone, com permissão própria e `PRIVACIDADE.md` novo |
