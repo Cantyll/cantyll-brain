@@ -40,7 +40,7 @@ Cada camada só importa das que estão à esquerda dela, além dos módulos comp
 
 | Camada | Responsabilidade | Qt | Depende do sistema |
 |---|---|:-:|:-:|
-| `core/` | Rede neural, emoção, homeostase, memória episódica, condicionamento, física, protesto | não | não |
+| `core/` | Rede neural, emoção, homeostase, homeostase sináptica, memória episódica, condicionamento, física, protesto | não | não |
 | `plataforma/` | Tudo que depende do sistema: janelas, teclado, tempo ocioso, atalho (um módulo por sistema) | não | sim |
 | `sense/` | O que as leituras significam e registro da rotina | não | não (usa `plataforma/`) |
 | `body/` | Janela do pet, estado que ele mostra, comportamento, bolinha | sim | não (usa `plataforma/`) |
@@ -86,6 +86,8 @@ As decisões de comportamento saem dos motores de decisão da rede (tabela em
 - sono pela pressão de sono e pelo relógio (`core/ritmo.py`, `mind/sleep.py`); a energia continua como drive, mas não manda no sono;
 - qual travessura fazer (memória episódica com bandit contextual).
 
+**Pendente (decisão D5, spec seção 14):** os gânglios da base podem passar a liberar as ações, no lugar das regras de limiar e sorteio. As guardas continuam fora da rede em qualquer caso. Até a decisão, vale o que está escrito acima.
+
 ## Aprendizado
 
 | Mecanismo | Onde | O que aprende |
@@ -94,6 +96,7 @@ As decisões de comportamento saem dos motores de decisão da rede (tabela em
 | Três fatores | `core/nervous_system.py` (`learn`) | Contextos ligados a carinho (+) e a dispensa ou castigo (−) |
 | Condicionamento | `core/conditioning.py` | Antecipar cutucada/arraste (`ANTICIPATE`) e ir para o canto (`ANTECIPA_PLACA`) |
 | Memória episódica | `core/episodic.py` | Qual travessura dá certo em cada contexto; o castigo pune a última |
+| Replay noturno e homeostase sináptica (SHY) | `core/homeostase_sinaptica.py`, `core/episodic.py`, `mind/sleep.py` | Consolida, no sono, os episódios mais marcantes; ao dormir, cada sinapse aprendida perde 20%, e o replay para de empurrar uma sinapse ao chegar a 50% do limite |
 | Cantinho | `mind/castigo_ctl.py` | Fugas que deram certo (memória de fuga) ou errado (receio) e rancor |
 
 ## Conteúdo de cada pet
@@ -148,6 +151,18 @@ Toda leitura e escrita passa por `store.py`:
 - Fechar, dispensar, pausar e o pânico sempre funcionam.
 - Nada de ler conteúdo ou título de janela.
 - Nada de culpar, pressionar ou bloquear a pessoa para ela usar mais o app.
+
+## Regras do núcleo biológico (R1 a R7)
+
+Mesmo texto da [especificação do núcleo biológico](ESPECIFICACAO_NUCLEO_BIOLOGICO.md), seção 1. Se as duas divergirem, corrija as duas no mesmo PR.
+
+- **R1. Sem culpa.** Nenhum estado cresce ou decai para pressionar a pessoa a voltar. Carência leva a sono ou repouso, nunca a tristeza ativa. Vale para carência em geral, nos dois casos: ausência (você fora do computador) e negligência (você presente, ignorando o pet). Decidido pelo Cantyll em 2026-11-11. Base: `ARQUITETURA.md`.
+- **R2. Reforço só por erro de predição.** Recompensa bruta não reforça comportamentos que chamam atenção, como `PEDIDO`.
+- **R3. Crescimento não é disparado por recompensa bruta.** Vale para sinaptogênese e neurogênese.
+- **R4. Segurança fica fora da rede.** Tela cheia, usuário ausente e limites de execução continuam em código de regras (guardas), que podem vetar qualquer ação da rede.
+- **R5. Biologia como fonte de fenômenos testáveis, não como cópia.** Cada parte tem nome biológico, função e teste.
+- **R6. Privacidade.** A rede recebe as mesmas categorias que `sense/senses.py` já produz. O estado salvo tem contagens e pesos, nunca títulos ou conteúdo. Base: `PRIVACIDADE.md`.
+- **R7. Mudança por fase, reversível.** Cada fase é ligada por configuração. O LIF continua disponível até o novo núcleo passar nos testes.
 
 ## Como a decisão funciona
 
