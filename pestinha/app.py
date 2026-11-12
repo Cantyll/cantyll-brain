@@ -19,6 +19,7 @@ Quem faz o quê:
     MischiefController      quando e como apronta; o que a dispensa causa
     FloatManager            painéis de teste
     SettingsStore           permissões e pânico
+    RegistroDeModulos       as frentes novas (core/modulos.py), ligadas por config.FRENTES
     PetState                o que ele sente e mostra (lido pela janela e pelo comportamento)
 """
 
@@ -59,6 +60,7 @@ from .core.conditioning import Conditioning
 from .core.emotion import PRIORITY, EmotionState
 from .core.episodic import EpisodicMemory
 from .core.homeostasis import Drives
+from .core.modulos import criar_registro
 from .core.nervous_system import criar_cerebro
 from .core.protesto import Protesto
 from .log import log
@@ -210,6 +212,12 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         self._pausado_em = None         # quando a pausa começou (para descontar do tempo dos episódios)
         self._ultimo_think = None       # quando a rede foi integrada pela última vez
         self.hidden = False
+
+        # ----- módulos das frentes (T1): só os ligados em config.FRENTES; desligados, nada muda -----
+        self.modulos = criar_registro(config.FRENTES, config.MODULOS_DAS_FRENTES, self,
+                                      pasta_de=self.pet_paths.modulo)
+        self.sleep.ao_dormir = lambda: self.modulos.ao_dormir(self.brain)
+        self.sleep.ao_acordar = lambda: self.modulos.ao_acordar(self.brain)
 
         # ----- relógios -----
         self.last_frame = time.monotonic()
@@ -408,6 +416,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         intensities.update(self.castigo.sinais(body))  # preso, memória de fuga, placa, visita, receio, rancor
         intensities["RECUSA"] = self.pulso_recusa
         self.pulso_recusa = 0.0
+        self.modulos.sentir(intensities, dt)        # frentes: podem acrescentar canais antes do passo
         total_ms = max(1, round(dt * 1000))
         self.brain.definir_ausencia(self.activity == "AWAY")   # R1: ausente, a rede segura fuga e travessura
         # M3: o padrão sensorial deste instante vai para os episódios que começarem agora (replay da noite)
@@ -419,6 +428,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
             self.brain.step(chunk)
             total_ms -= chunk
         self.intensities = intensities
+        self.modulos.depois_do_passo(self.brain, self.drives, dt)
         motor = self.brain.motor_activity()
         st.tone.update(motor, dt)
 
@@ -444,8 +454,9 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
             if self.mischief_ctl.penalty_active(now):
                 reward += DISMISS_PENALTY * self.mischief_ctl.peso_penalidade     # habituação: a repetida pesa menos
         reward += self.castigo.punicao(now)          # ser preso é recompensa negativa: o castigo ensina
-        # expected = 0: recompensa bruta, como antes. O V do condicionamento só entra no M2 (decisão D3).
-        self.brain.learn(reward, 0.0, dt, self.prof["learn_rate"])
+        # expected = 0: recompensa bruta, como antes. O V entra pelo módulo que responder (PL-1; decisão D3).
+        esperado = self.modulos.valor_esperado()
+        self.brain.learn(reward, 0.0 if esperado is None else esperado, dt, self.prof["learn_rate"])
         if self.asleep:                                  # M3: o replay da noite roda um pedaço por quadro
             self.sleep.replay_passo(self.brain, REPLAY_MS_POR_FRAME, self.prof["learn_rate"])
 

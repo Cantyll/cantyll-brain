@@ -13,7 +13,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 PACOTE = RAIZ / "pestinha"
 
 CAMADAS = [
-    ("core", "Cérebro e regras puras: rede neural, emoção, homeostase, memória, condicionamento, física e protesto. "
+    ("core", "Cérebro e regras puras: rede neural, emoção, homeostase, memória, condicionamento, física, protesto "
+             "e o registro de módulos por onde as frentes novas entram (`modulos.py`). "
              "Sem Qt e sem API do sistema, para ser testável em qualquer lugar.", "módulos compartilhados"),
     ("plataforma", "Tudo que depende do sistema operacional: programa em primeiro plano, tempo ocioso, janelas, "
                    "tela cheia, foco e o atalho de pânico. Um módulo por sistema (Windows, macOS, Linux). "
