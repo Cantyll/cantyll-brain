@@ -7,6 +7,7 @@ aprendizado faz em semanas: se alguma população morre (PLAYFUL) ou satura (GLO
     python ferramentas/simular_noites.py --noites 60 --semente 3 --json saida.json
     python ferramentas/simular_noites.py --sonos 3            # a noite picada em 3 sonos (acordado e dormindo de novo)
     python ferramentas/simular_noites.py --sem-shy            # roda também o controle sem SHY
+    python ferramentas/simular_noites.py --sem-habituacao     # roda também sem a habituação à dispensa
     python ferramentas/simular_noites.py --pulsos             # o replay simula os pulsos (mais lento, mesmas sinapses)
 
 É critério de aceitação de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase
@@ -18,6 +19,8 @@ do replay), SleepController (a noite inteira, quadro a quadro) e os números de 
 O que é suposição, e não medida de uso real:
 - O dia. Cada cenário diz quantas travessuras são dispensadas, quantas ficam na tela e quantos carinhos
   ele ganha por dia, e em que atividade cada coisa acontece (CONTEXTOS). Ninguém mediu isso ainda.
+- A hora de cada evento: sorteada por igual nas DIA_ACORDADO_S horas acordado, com um sorteio à parte
+  (com a habituação desligada, o resultado é o mesmo de antes dela). Só a habituação à dispensa usa a hora.
 - O dia é comprimido: só os instantes com recompensa são simulados. O aprendizado de dia depende dos
   níveis sensoriais e da recompensa, não dos pulsos, então as sinapses saem iguais às de um dia inteiro.
 - No replay, por padrão, os pulsos não são simulados (`_RedeDeSimulacao`). No LIFBrain o aprendizado
@@ -53,6 +56,7 @@ from pestinha import config  # noqa: E402
 from pestinha.core import episodic  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
 from pestinha.core.episodic import EpisodicMemory  # noqa: E402
+from pestinha.core.habituacao import Habituacao  # noqa: E402
 from pestinha.core.nervous_system import LIFBrain  # noqa: E402
 from pestinha.mind.sleep import SleepController  # noqa: E402
 
@@ -80,6 +84,8 @@ CENARIOS = {
 }
 
 PRESSAO_AO_DORMIR = 0.82        # P de quem ficou ~14 h acordado depois de acordar em 0,25 (ritmo.py)
+DIA_ACORDADO_S = 14 * 3600.0    # s acordado por dia, em que os eventos do cenário se espalham
+DIA_S = 24 * 3600.0
 DEGRAUS_DA_NOITE = 40           # em quantos degraus a pressão cai numa noite inteira
 MEDIDA_AQUECE_MS = 300
 MEDIDA_MS = 2000                # por contexto, em cada medida
@@ -158,16 +164,24 @@ def _carinho(brain, sentidos, segundos, taxa):
         brain.learn(ajustes.RECOMPENSA_CARINHO, 0.0, 0.1, taxa)
 
 
-def simular_dia(brain, memoria, rng, cenario, perfil):
-    """Um dia comprimido: os eventos do cenário, em ordem sorteada, cada um num contexto sorteado."""
+def simular_dia(brain, memoria, rng, cenario, perfil, habituacao=None, relogio=None, inicio_s=0.0):
+    """
+    Um dia comprimido: os eventos do cenário, em ordem sorteada, cada um num contexto sorteado.
+    habituacao: a Habituacao do app (None: toda dispensa pesa 1). relogio: o sorteio das horas (só a
+    habituação usa; separado de rng para não mudar o resto). inicio_s: a hora em que o dia começa.
+    """
     taxa = perfil["learn_rate"]
     eventos = ["dispensa"] * cenario["dispensas"] + ["aceita"] * cenario["aceitas"] + ["carinho"] * cenario["carinhos"]
     rng.shuffle(eventos)
-    for evento in eventos:
+    horas = (np.sort(relogio.uniform(0.0, DIA_ACORDADO_S, len(eventos))) if relogio is not None
+             else np.zeros(len(eventos)))
+    for evento, hora in zip(eventos, horas):
         atividade, sentidos = _sorteia_contexto(rng)
         _assenta(brain, sentidos)
         if evento == "carinho":
             _carinho(brain, sentidos, float(rng.uniform(2.0, 5.0)), taxa)
+            if habituacao is not None:
+                habituacao.desabituar(ajustes.DESABITUACAO_CARINHO)
             continue
         memoria.sentidos_atuais = dict(sentidos)
         objeto = object()
@@ -175,10 +189,11 @@ def simular_dia(brain, memoria, rng, cenario, perfil):
         if evento == "dispensa":
             # fechou entre 1 s e a paciência do perfil; a rede sente o pulso DISMISS e a penalidade (mischief_ctl)
             memoria.on_dismiss(objeto, float(rng.uniform(1.0, perfil["dismiss_patience"])), perfil["dismiss_patience"])
+            peso = habituacao.registrar(inicio_s + float(hora)) if habituacao is not None else 1.0
             pulso = 0.7
             for _ in range(int(round(ajustes.PENALIDADE_DISPENSA * 10))):
                 brain.stimulate(dict(sentidos, DISMISS=pulso))
-                brain.learn(ajustes.PUNICAO_DISPENSA, 0.0, 0.1, taxa)
+                brain.learn(ajustes.PUNICAO_DISPENSA * peso, 0.0, 0.1, taxa)
                 pulso *= math.exp(-0.1 / 6.0)
         else:
             # ficou na tela até valer como aceita (episodic.tick)
@@ -250,6 +265,8 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
         brain = (LIFBrain if pulsos else _RedeDeSimulacao)(seed=semente, seed_ruido=semente + 1000)
         sono = SleepController(None, _Necessidades(), memoria, lambda: False)
         rng = np.random.default_rng(semente)
+        relogio = np.random.default_rng(semente + 2000)
+        habituacao = Habituacao(ajustes.HABITUACAO_DISPENSA, ajustes.RECUPERACAO_DISPENSA_H * 3600.0)
         j = {post: k for k, post in enumerate(brain.plastic_posts)}
         pressoes = np.linspace(PRESSAO_AO_DORMIR, ajustes.LIMIAR_ACORDA_PRESSAO, int(sonos) + 1)
         base = None
@@ -268,7 +285,7 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
             if dia == noites:
                 linhas[-1]["aprendido"] = brain.learned.tolist()
                 break
-            simular_dia(brain, memoria, rng, regras, perfil)
+            simular_dia(brain, memoria, rng, regras, perfil, habituacao, relogio, dia * DIA_S)
             for de, ate in zip(pressoes[:-1], pressoes[1:]):
                 simular_noite(brain, sono, perfil, float(de), float(ate))
     return linhas
@@ -299,6 +316,8 @@ def main():
     parser.add_argument("--semente", type=int, default=7)
     parser.add_argument("--sonos", type=int, default=1, help="em quantos sonos cada noite é picada (padrão: 1)")
     parser.add_argument("--sem-shy", action="store_true", help="roda também sem o SHY (HOMEOSTASE_SHY = 0), para comparar")
+    parser.add_argument("--sem-habituacao", action="store_true",
+                        help="roda também sem a habituação à dispensa (HABITUACAO_DISPENSA = 0), para comparar")
     parser.add_argument("--pulsos", action="store_true", help="simula os pulsos no replay, como o app (mais lento)")
     parser.add_argument("--json", help="grava as linhas neste arquivo")
     args = parser.parse_args()
@@ -307,10 +326,15 @@ def main():
     print(f"Cenário {args.cenario}: {regras['descricao']}. Perfil {regras['perfil']}, semente {args.semente}, "
           f"{args.noites} noites, {args.sonos} sono(s) por noite.\n")
     saida = {"com_shy": simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos)}
-    imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}", saida["com_shy"])
+    imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}, HABITUACAO_DISPENSA = {ajustes.HABITUACAO_DISPENSA}, "
+             f"RECUPERACAO_DISPENSA_H = {ajustes.RECUPERACAO_DISPENSA_H}", saida["com_shy"])
     if args.sem_shy:
         saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, HOMEOSTASE_SHY=0.0)
         imprimir("Sem SHY (HOMEOSTASE_SHY = 0)", saida["sem_shy"])
+    if args.sem_habituacao:
+        saida["sem_habituacao"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos,
+                                          HABITUACAO_DISPENSA=0.0)
+        imprimir("Sem habituação à dispensa (HABITUACAO_DISPENSA = 0)", saida["sem_habituacao"])
     if args.json:
         Path(args.json).write_text(json.dumps(saida, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"Linhas gravadas em {args.json}")

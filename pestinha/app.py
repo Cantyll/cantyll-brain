@@ -383,6 +383,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
             self.drives.stimulate("caress", dt)
             self.drives.touched("caress", dt)
             self.memory.on_interaction()
+        self.mischief_ctl.ao_carinho(caressing)          # carinho desfaz parte da habituação à dispensa
 
         intensities = self.senses.update(self.activity, idle, self.drives.channels(), caressing, mouse_moving)
         # condicionamento: o cursor vindo rápido para ele, ou o botão apertado em cima, antecipam
@@ -441,7 +442,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
             if caressing:
                 reward += CARESS_REWARD
             if self.mischief_ctl.penalty_active(now):
-                reward += DISMISS_PENALTY
+                reward += DISMISS_PENALTY * self.mischief_ctl.peso_penalidade     # habituação: a repetida pesa menos
         reward += self.castigo.punicao(now)          # ser preso é recompensa negativa: o castigo ensina
         # expected = 0: recompensa bruta, como antes. O V do condicionamento só entra no M2 (decisão D3).
         self.brain.learn(reward, 0.0, dt, self.prof["learn_rate"])
