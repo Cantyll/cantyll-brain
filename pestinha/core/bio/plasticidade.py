@@ -1,5 +1,5 @@
 """
-Plasticidade do BioBrain com erro de predição (PL-1, parte 1; spec, seções 7.2 e 7.4; decisão D3).
+Plasticidade do BioBrain com erro de predição (PL-1, parte 1; spec, seções 7.2 e 7.4; decisão D3). Dono: PL-1.
 
 Desligada (ajustes.PL_DELTA = False), o BioBrain aprende como o LIF: δ = r − expected com expected = 0 no app,
 ou seja, recompensa bruta. Ligada, δ é o erro de diferença temporal do crítico (core/conditioning.py, decisão
