@@ -124,6 +124,28 @@ class TabelaDeSinapses:
         idx = np.repeat(comeco - np.cumsum(tamanho) + tamanho, tamanho) + np.arange(total)
         return np.bincount(self.pos[idx], weights=self.peso[idx] * atividade[self.pre[idx]], minlength=self.n_pos)
 
+    def propagar_por_sinal(self, atividade, disparou):
+        """
+        Como `propagar`, mas com a corrente separada por sinal do peso efetivo: (excitatória, inibitória).
+        A soma das duas é a corrente de `propagar` (a menos do arredondamento). Usada pelos neurônios de
+        Izhikevich, que têm uma corrente sináptica para cada sinal (AMPA e GABA).
+        """
+        if disparou.size == 0:
+            return np.zeros(self.n_pos), np.zeros(self.n_pos)
+        comeco = self.inicio[disparou]
+        tamanho = self.inicio[disparou + 1] - comeco
+        total = int(tamanho.sum())
+        if total == 0:
+            return np.zeros(self.n_pos), np.zeros(self.n_pos)
+        idx = np.repeat(comeco - np.cumsum(tamanho) + tamanho, tamanho) + np.arange(total)
+        peso = self.peso[idx]
+        valor = peso * atividade[self.pre[idx]]
+        alvo = self.pos[idx]
+        positivo = peso > 0.0
+        excitatoria = np.bincount(alvo[positivo], weights=valor[positivo], minlength=self.n_pos)
+        inibitoria = np.bincount(alvo[~positivo], weights=valor[~positivo], minlength=self.n_pos)
+        return excitatoria, inibitoria
+
     def densa(self):
         """Matriz densa (pré × destino) com os pesos efetivos. Só para ferramentas e testes."""
         matriz = np.zeros((self.n_pre, self.n_pos))
