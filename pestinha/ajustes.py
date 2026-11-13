@@ -147,6 +147,26 @@ NE_GANHO_CALM = 0.92
 NE_GANHO_TIRED = 0.957
 NE_GANHO_FRUSTRATION = 1.04
 NE_GANHO_GLOOM = 0.894
+NE_MOTORES = False              # NE-4: os 15 motores em Izhikevich (14 RS, STARTLE CH), o pulso gasta a corrente (R7)
+# Ganhos da NE-4, ajustados como os da NE-3 (python ferramentas/comparar_izhikevich.py --ajustar ne4), com a NE-2 e a
+# NE-3 ligadas. Os limiares de decisão em Hz (LIMIAR_*_HZ, castigo_ctl, mesa, MotorDecoder, Emotion) não mudam: a
+# NE-4 só passa se as taxas e o comportamento decodificado ficarem os do LIF (tests/test_ne4_motores.py). O STARTLE
+# fica fora da bisseção: o ganho dele iguala o reflexo de susto (--comportamento ne4), não a taxa somada.
+NE_GANHO_STARTLE = 0.5
+NE_GANHO_WATCH = 0.809
+NE_GANHO_WANDER = 0.87
+NE_GANHO_CHEER = 0.968
+NE_GANHO_SETTLE = 1.055
+NE_GANHO_DROWSE = 0.964
+NE_GANHO_ANGRY = 1.087
+NE_GANHO_SAD = 1.011
+NE_GANHO_SENTAR = 0.866
+NE_GANHO_FUGIR = 1.078
+NE_GANHO_CARTAZ = 0.998
+NE_GANHO_CANTO = 1.011
+NE_GANHO_TRAVESSURA = 0.993
+NE_GANHO_PAPEL = 1.024
+NE_GANHO_ACEITAR = 1.002
 # Numba (decisão do Cantyll, 2026-11-13, opção C): com o Numba instalado (requirements-numba.txt), o passo do BioBrain
 # roda compilado, com os mesmos pulsos do numpy (core/bio/acelerado.py). Sem o Numba, ou com False, fica o numpy.
 NE_NUMBA = True
@@ -348,6 +368,21 @@ _LIMITES = {
     "NE_GANHO_TIRED": (float, 0.05, 10.0),
     "NE_GANHO_FRUSTRATION": (float, 0.05, 10.0),
     "NE_GANHO_GLOOM": (float, 0.05, 10.0),
+    "NE_GANHO_STARTLE": (float, 0.05, 10.0),
+    "NE_GANHO_WATCH": (float, 0.05, 10.0),
+    "NE_GANHO_WANDER": (float, 0.05, 10.0),
+    "NE_GANHO_CHEER": (float, 0.05, 10.0),
+    "NE_GANHO_SETTLE": (float, 0.05, 10.0),
+    "NE_GANHO_DROWSE": (float, 0.05, 10.0),
+    "NE_GANHO_ANGRY": (float, 0.05, 10.0),
+    "NE_GANHO_SAD": (float, 0.05, 10.0),
+    "NE_GANHO_SENTAR": (float, 0.05, 10.0),
+    "NE_GANHO_FUGIR": (float, 0.05, 10.0),
+    "NE_GANHO_CARTAZ": (float, 0.05, 10.0),
+    "NE_GANHO_CANTO": (float, 0.05, 10.0),
+    "NE_GANHO_TRAVESSURA": (float, 0.05, 10.0),
+    "NE_GANHO_PAPEL": (float, 0.05, 10.0),
+    "NE_GANHO_ACEITAR": (float, 0.05, 10.0),
     # <<< decisões
     "LADO_JANELA_PET": (int, 100, 1000),
     "ZZZ_QUANTIDADE": (int, 0, 20),

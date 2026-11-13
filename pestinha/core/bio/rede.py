@@ -49,6 +49,13 @@ BIO_VERSION = 1
 # NE-3: os interneurônios excitatórios e o tipo de cada um.
 EXCITATORIOS_NE3 = ("ALERT", "FOCUS", "CURIOUS", "PLAYFUL", "CALM", "TIRED", "FRUSTRATION", "GLOOM")
 TIPO_NE3 = {name: "RS" for name in EXCITATORIOS_NE3}
+# NE-4: os motores e o tipo de cada um. Todos RS, menos o STARTLE, em CH (rajadas): o susto é lido na subida
+# (MotorDecoder e Emotion, limiar de 7 Hz em ~100 ms), e em RS a resposta a um estímulo curto achata. Com o ganho
+# que iguala a taxa somada, um susto de 300 ms passa de 7 Hz em 2 de 10 sementes contra 10 de 10 no LIF; com
+# qualquer ganho em RS, ou se perde o susto do impacto ou ele dispara com cutucão. Em CH a rajada inicial devolve a
+# subida rápida (ferramentas/comparar_izhikevich.py --comportamento).
+MOTORES_NE4 = tuple(m[0] for m in ns.MOTOR_SPEC)
+TIPO_NE4 = {name: "RS" for name in MOTORES_NE4} | {"STARTLE": "CH"}
 
 
 def neuronios_das_chaves():
@@ -65,12 +72,24 @@ def neuronios_das_chaves():
         ganho.update(ALERT=ajustes.NE_GANHO_ALERT, FOCUS=ajustes.NE_GANHO_FOCUS, CURIOUS=ajustes.NE_GANHO_CURIOUS,
                      PLAYFUL=ajustes.NE_GANHO_PLAYFUL, CALM=ajustes.NE_GANHO_CALM, TIRED=ajustes.NE_GANHO_TIRED,
                      FRUSTRATION=ajustes.NE_GANHO_FRUSTRATION, GLOOM=ajustes.NE_GANHO_GLOOM)
+    if ajustes.NE_MOTORES:                                      # NE-4
+        tipos.update(TIPO_NE4)
+        ganho.update(STARTLE=ajustes.NE_GANHO_STARTLE, WATCH=ajustes.NE_GANHO_WATCH, WANDER=ajustes.NE_GANHO_WANDER,
+                     CHEER=ajustes.NE_GANHO_CHEER, SETTLE=ajustes.NE_GANHO_SETTLE, DROWSE=ajustes.NE_GANHO_DROWSE,
+                     ANGRY=ajustes.NE_GANHO_ANGRY, SAD=ajustes.NE_GANHO_SAD, SENTAR=ajustes.NE_GANHO_SENTAR,
+                     FUGIR=ajustes.NE_GANHO_FUGIR, CARTAZ=ajustes.NE_GANHO_CARTAZ, CANTO=ajustes.NE_GANHO_CANTO,
+                     TRAVESSURA=ajustes.NE_GANHO_TRAVESSURA, PAPEL=ajustes.NE_GANHO_PAPEL, ACEITAR=ajustes.NE_GANHO_ACEITAR)
     return tipos, ganho, {name: "membrana" for name in tipos}
 
 
 def gasto_das_chaves():
-    """Populações em que o pulso gasta a corrente sináptica (`gasta_corrente` do BioBrain), pelas chaves da NE-3."""
-    return set(EXCITATORIOS_NE3) if ajustes.NE_EXCITATORIOS else set()
+    """Populações em que o pulso gasta a corrente sináptica (`gasta_corrente` do BioBrain), pelas chaves da NE-3 e da NE-4."""
+    gasta = set()
+    if ajustes.NE_EXCITATORIOS:
+        gasta |= set(EXCITATORIOS_NE3)
+    if ajustes.NE_MOTORES:
+        gasta |= set(MOTORES_NE4)
+    return gasta
 
 
 class Pool(dict):

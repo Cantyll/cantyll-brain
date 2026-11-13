@@ -22,7 +22,8 @@ def _config(nome, monkeypatch):
     if nome == "lif":
         return {"tipos": {}}
     monkeypatch.setattr(ajustes, "NE_INIBIDORES_FS", True)
-    monkeypatch.setattr(ajustes, "NE_EXCITATORIOS", nome == "ne3")
+    monkeypatch.setattr(ajustes, "NE_EXCITATORIOS", nome in ("ne3", "ne4"))
+    monkeypatch.setattr(ajustes, "NE_MOTORES", nome == "ne4")              # NE-4: motores em RS e o STARTLE em CH
     tipos, ganho, tau = neuronios_das_chaves()
     return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau, "gasta_corrente": gasto_das_chaves()}
 
@@ -60,7 +61,7 @@ ROTEIRO = [
 
 
 @precisa_numba
-@pytest.mark.parametrize("nome", ["lif", "ne2", "ne3"])
+@pytest.mark.parametrize("nome", ["lif", "ne2", "ne3", "ne4"])
 def test_mesmos_pulsos_passo_a_passo(nome, monkeypatch):
     a, b = _par(_config(nome, monkeypatch), monkeypatch)
     total = 0
@@ -80,7 +81,7 @@ def test_mesmos_pulsos_passo_a_passo(nome, monkeypatch):
 
 
 @precisa_numba
-@pytest.mark.parametrize("nome", ["lif", "ne3"])
+@pytest.mark.parametrize("nome", ["lif", "ne3", "ne4"])
 def test_mesmo_aprendizado_e_mesmas_taxas(nome, monkeypatch):
     """Com aprendizado (pesos plásticos mudam) e step(), as taxas e a matriz aprendida saem iguais."""
     a, b = _par(_config(nome, monkeypatch), monkeypatch, seed=11, seed_ruido=3)

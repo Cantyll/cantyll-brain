@@ -3,7 +3,8 @@ Gera docs/REDE_NEURAL.md a partir do código (canais, interneurônios, motores, 
 
     python ferramentas/gerar_doc_rede.py
 
-Rode de novo sempre que mexer em pestinha/core/nervous_system.py ou nos limiares de pestinha/ajustes.py.
+Rode de novo sempre que mexer em pestinha/core/nervous_system.py, nos limiares de pestinha/ajustes.py ou no modelo
+de neurônio de cada população (pestinha/core/bio/rede.py, frente NE).
 """
 import re
 import sys
@@ -16,7 +17,13 @@ import numpy as np  # noqa: E402
 
 from pestinha import ajustes  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
+from pestinha.core import emotion  # noqa: E402
+from pestinha.core.bio.neuronios import TIPOS, reobase  # noqa: E402
+from pestinha.core.bio.rede import gasto_das_chaves, neuronios_das_chaves  # noqa: E402
+from pestinha.mind import castigo_ctl  # noqa: E402
 from pestinha.ui.rotulos import CANAIS_SENSORIAIS, INTERNEURONIOS, MOTORES  # noqa: E402
+
+CHAVES_NE = ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES")
 
 FONTE = (RAIZ / "pestinha" / "core" / "nervous_system.py").read_text(encoding="utf-8")
 
@@ -38,17 +45,68 @@ def entradas_de(pos):
     return ", ".join(f"{pre} ({'+' if w > 0 else '−'}{abs(w):.2f})" for pre, w in sorted(pares, key=lambda p: -abs(p[1])))
 
 
+def modelos_com_as_chaves():
+    """{população: (tipo Izhikevich, ganho, gasta corrente)} com as chaves da frente NE ligadas."""
+    antes = {k: getattr(ajustes, k) for k in CHAVES_NE}
+    try:
+        for k in CHAVES_NE:
+            setattr(ajustes, k, True)
+        tipos, ganho, _tau = neuronios_das_chaves()
+        gasta = gasto_das_chaves()
+    finally:
+        for k, v in antes.items():
+            setattr(ajustes, k, v)
+    return {n: (t, ganho.get(n, 1.0), n in gasta) for n, t in tipos.items()}
+
+
+def modelo(nome, modelos):
+    if nome not in modelos:
+        return "LIF"
+    tipo, ganho, _ = modelos[nome]
+    return f"{tipo} ×{ganho:g}"
+
+
 def main():
     brain = ns.LIFBrain(seed=7)
+    modelos = modelos_com_as_chaves()
+    ligadas = [k for k in CHAVES_NE if getattr(ajustes, k)]
     com_s, com_m = comentarios_sensoriais(), comentarios_motores()
     linhas = [
         "# A rede neural do pet",
         "",
         "> Gerado por `ferramentas/gerar_doc_rede.py` a partir do código. Não edite à mão: rode o script.",
         "",
-        f"A rede tem **{brain.N} neurônios** de integração e disparo com vazamento (LIF), "
+        f"A rede tem **{brain.N} neurônios**, "
         f"**{int(np.count_nonzero(brain.W))} sinapses**, **{len(ns.SENSORY_SPEC)} canais sensoriais**, "
         f"**{len(ns.INTER_SPEC)} populações de interneurônios** e **{len(ns.MOTOR_SPEC)} populações motoras**.",
+        "",
+        "## Modelo de neurônio",
+        "",
+        "Há dois cérebros com a mesma rede (as mesmas populações e sinapses): o `LIFBrain`, padrão do app hoje, e o "
+        "`BioBrain` (`PESTINHA_CEREBRO=bio` ou `cerebro = \"bio\"`). No `LIFBrain` todo neurônio é de integração e "
+        "disparo com vazamento (LIF). No `BioBrain`, as chaves da frente NE em `ajustes.py` passam populações para o "
+        "modelo de Izhikevich, uma frente por vez: "
+        + ", ".join(f"`{k}`" for k in CHAVES_NE) + ". "
+        + (f"Ligadas agora: {', '.join(f'`{k}`' for k in ligadas)}." if ligadas else "Todas desligadas agora (R7).")
+        + " As colunas \"Com as chaves NE\" abaixo dizem o modelo de cada população com as três ligadas "
+        "(tipo e ganho sobre a escala de corrente).",
+        "",
+        "| Tipo | a | b | c (mV) | d | Reobase | Populações com as chaves NE |",
+        "|---|---:|---:|---:|---:|---:|---|",
+    ]
+    for tipo, (a, b, c, d) in TIPOS.items():
+        quem = [n for n, (t, *_r) in modelos.items() if t == tipo]
+        linhas.append(f"| {tipo} | {a:g} | {b:g} | {c:g} | {d:g} | {reobase(tipo):.2f} | "
+                      f"{', '.join(f'`{n}`' for n in quem) or '—'} |")
+    linhas += [
+        "",
+        "- **Correntes sinápticas:** τ = τ_m que a população tinha no LIF (decisão A da NE-1), para a mesma "
+        "integração lenta.",
+        "- **Gasto:** nas populações excitatórias e motoras, cada pulso tira da corrente um limiar do LIF "
+        "(reobase × ganho), como o reset do LIF (NE-3). As inibitórias FS não gastam.",
+        "- **Ganhos:** ajustados para a taxa de cada população ficar a do LIF "
+        "(`python ferramentas/comparar_izhikevich.py --ajustar ne3` e `--ajustar ne4`). O do `STARTLE`, em CH, "
+        "iguala o reflexo de susto, não a taxa (`--comportamento ne4`).",
         "",
         "## Como o sinal anda",
         "",
@@ -83,16 +141,19 @@ def main():
     for nome, (_n, _taxa, d, tau) in ns.SENSORY_SPEC.items():
         hab = "não" if d == 0 else f"{d:g} / {tau:g} s"
         linhas.append(f"| `{nome}` | {CANAIS_SENSORIAIS.get(nome, '')} | {hab} | {com_s.get(nome, '')} |")
-    linhas += ["", "## Interneurônios", "", "| População | Nome no monitor | Tipo | Neurônios | Entradas (peso) |",
-               "|---|---|---|---:|---|"]
-    for nome, tipo, n, *_ in ns.INTER_SPEC:
+    linhas += ["", "## Interneurônios", "",
+               "| População | Nome no monitor | Tipo | Neurônios | τ_m (ms) | Com as chaves NE | Entradas (peso) |",
+               "|---|---|---|---:|---:|---|---|"]
+    for nome, tipo, n, tau_m, *_ in ns.INTER_SPEC:
         linhas.append(f"| `{nome}` | {INTERNEURONIOS.get(nome, '')} | {'excitatória' if tipo == 'exc' else 'inibitória'} "
-                      f"| {n} | {entradas_de(nome)} |")
-    linhas += ["", "## Motores", "", "| Motor | Grupo | Nome no monitor | Entradas (peso) | Para que serve |",
-               "|---|---|---|---|---|"]
-    for nome, n, *_ in ns.MOTOR_SPEC:
+                      f"| {n} | {tau_m:g} | {modelo(nome, modelos)} | {entradas_de(nome)} |")
+    linhas += ["", "## Motores", "",
+               "| Motor | Grupo | Nome no monitor | τ_m (ms) | Com as chaves NE | Entradas (peso) | Para que serve |",
+               "|---|---|---|---:|---|---|---|"]
+    for nome, n, tau_m, *_ in ns.MOTOR_SPEC:
         grupo = "decisão" if nome in ns.DECISION_MOTORS else "expressão"
-        linhas.append(f"| `{nome}` | {grupo} | {MOTORES.get(nome, '')} | {entradas_de(nome)} | {com_m.get(nome, '')} |")
+        linhas.append(f"| `{nome}` | {grupo} | {MOTORES.get(nome, '')} | {tau_m:g} | {modelo(nome, modelos)} | "
+                      f"{entradas_de(nome)} | {com_m.get(nome, '')} |")
     linhas += [
         "",
         "## Decisões pela rede",
@@ -101,9 +162,16 @@ def main():
         "",
         "| Decisão | Regra |",
         "|---|---|",
+        f"| Comportamento atual (`MotorDecoder`) | o motor mais ativo, se ≥ {ns.MotorDecoder().threshold:g} Hz; sai "
+        f"abaixo de {ns.MotorDecoder().threshold * ns.MotorDecoder().exit_ratio:g} Hz e fica ao menos "
+        f"{ns.MotorDecoder().min_dwell:g} s. `STARTLE` ≥ {ns.MotorDecoder().threshold:g} Hz passa na frente. |",
+        f"| Susto na cara (`core/emotion.py`) | `STARTLE` ≥ {emotion.STARTLE_HZ:g} Hz na subida; rearma abaixo de "
+        f"{0.3 * emotion.STARTLE_HZ:g} Hz. |",
         f"| Sentar no notebook | `SENTAR` ≥ {ajustes.LIMIAR_SENTAR_HZ:g} Hz senta; < {ajustes.LIMIAR_LEVANTAR_HZ:g} Hz levanta (histerese). |",
         f"| Fugir do cantinho | `FUGIR` acima de {ajustes.LIMIAR_FUGA_HZ:g} Hz enche a vontade; {ajustes.CARGA_FUGA_HZ_S:g} Hz·s a enchem (um pico não basta). |",
-        "| Perdoar o castigo | `ACEITAR` acima do limiar em `mind/castigo_ctl.py` (`LIMIAR_PERDAO_HZ`): sai sozinho, sem contar fuga. |",
+        f"| Perdoar o castigo | `ACEITAR` ≥ {castigo_ctl.LIMIAR_PERDAO_HZ:g} Hz (`mind/castigo_ctl.py`): sai sozinho, sem contar fuga. |",
+        f"| Olhar e virar de costas no castigo | `ANGRY` ≥ {castigo_ctl.COSTAS_HZ:g} Hz vira de costas; senão `WATCH` ≥ "
+        f"{castigo_ctl.OLHAR_HZ:g} Hz olha para você. |",
         f"| Ir para o cantinho | `CANTO` ≥ {ajustes.LIMIAR_CANTO_HZ:g} Hz. |",
         f"| Travessuras | por segundo: taxa de `TRAVESSURA` × {ajustes.GANHO_TRAVESSURA:g}. |",
         f"| Cartazes do castigo | por segundo: taxa de `CARTAZ` × {ajustes.GANHO_CARTAZ:g} (cada um fica ao menos 8 s). |",
