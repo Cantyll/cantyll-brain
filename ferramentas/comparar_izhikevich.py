@@ -53,7 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from pestinha import ajustes  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
-from pestinha.core.bio import BioBrain  # noqa: E402
+from pestinha.core.bio import BioBrain, acelerado  # noqa: E402
 from pestinha.core.bio.rede import EXCITATORIOS_NE3, gasto_das_chaves, neuronios_das_chaves  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -108,8 +108,15 @@ CONFIGS["chaves_ne2"] = _com_chaves("ne2")
 CONFIGS["chaves_ne3"] = _com_chaves("ne3")
 
 
-def cerebro(config, seed_ruido=42):
-    return BioBrain(seed=7, seed_ruido=seed_ruido, **CONFIGS[config])
+def cerebro(config, seed_ruido=42, numba=None):
+    """BioBrain da configuração. numba: True ou False força o caminho do passo; None segue ajustes.NE_NUMBA."""
+    antes = ajustes.NE_NUMBA
+    if numba is not None:
+        ajustes.NE_NUMBA = numba
+    try:
+        return BioBrain(seed=7, seed_ruido=seed_ruido, **CONFIGS[config])
+    finally:
+        ajustes.NE_NUMBA = antes
 
 
 CALIBRAR = {"ne2": ("QUIET", "INHIB")}
@@ -230,9 +237,9 @@ def portao(frente, extra=()):
     linha_de_base.main()
 
 
-def custo(config, rodadas=RODADAS):
+def custo(config, rodadas=RODADAS, numba=None):
     """Mediana de µs (relógio e CPU) por passo de 1 ms, com 1 s simulado por rodada, e pulsos por passo."""
-    b = cerebro(config)
+    b = cerebro(config, numba=numba)
 
     def um_segundo():
         b.stimulate(ESTIMULO)
@@ -253,6 +260,7 @@ def custo(config, rodadas=RODADAS):
         "pulsos_por_passo": float(b.disparos.sum() - antes) / (1000 * rodadas),
         "izhikevich": 0 if b.izhikevich is None else b.izhikevich.n,
         "N": b.N,
+        "caminho": "numba" if b.numba else "numpy",
     }
 
 
@@ -292,13 +300,16 @@ def main(argv=None):
     configs = args.config or list(CONFIGS)
 
     if args.so != "atividade":
-        print("Custo por passo de 1 ms (semente 7, estímulo fixo; mediana de", args.rodadas, "rodadas)\n")
-        print("| configuração | em Izhikevich | µs/passo | µs CPU/passo | % de um núcleo | pulsos/passo |")
-        print("|---|---|---|---|---|---|")
+        caminhos = (False, True) if acelerado.DISPONIVEL else (False,)
+        print("Custo por passo de 1 ms (semente 7, estímulo fixo; mediana de", args.rodadas, "rodadas)")
+        print("Numba:", f"versão {acelerado.VERSAO}" if acelerado.DISPONIVEL else acelerado.MOTIVO, "\n")
+        print("| configuração | caminho | em Izhikevich | µs/passo | µs CPU/passo | % de um núcleo | pulsos/passo |")
+        print("|---|---|---|---|---|---|---|")
         for config in configs:
-            c = custo(config, args.rodadas)
-            print(f"| {config} | {c['izhikevich']} de {c['N']} | {c['us_por_passo']:.1f} | "
-                  f"{c['us_cpu_por_passo']:.1f} | {c['us_por_passo'] / 10:.1f}% | {c['pulsos_por_passo']:.2f} |")
+            for numba in caminhos:
+                c = custo(config, args.rodadas, numba=numba)
+                print(f"| {config} | {c['caminho']} | {c['izhikevich']} de {c['N']} | {c['us_por_passo']:.1f} | "
+                      f"{c['us_cpu_por_passo']:.1f} | {c['us_por_passo'] / 10:.1f}% | {c['pulsos_por_passo']:.2f} |")
         print()
 
     if args.so != "custo":

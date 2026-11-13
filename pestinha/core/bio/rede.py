@@ -38,9 +38,10 @@ from .. import nervous_system as ns
 from ..homeostase_sinaptica import downscaling, saturacao
 from ..nervous_system import Brain, LEARN_MAX, LEARN_MIN, LEARN_RATE_PADRAO
 from .neuronios import Neuronio
+from . import acelerado
 from . import plasticidade as pl
 from .projecoes import compilar, projecao_de_bloco
-from .neuronios import TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, escala_de_corrente  # NE-1
+from .neuronios import PICO, TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, escala_de_corrente  # NE-1
 
 BIO_VERSION = 1
 
@@ -91,6 +92,7 @@ class BioBrain(Brain):
     """Rede neural pulsada com populações e projeções explícitas. Mesma estrutura do LIFBrain nesta fase."""
     SEED = ns.LIFBrain.SEED
     izhikevich = None                                           # sem população em Izhikevich (padrão)
+    numba = False                                               # passo em numpy até o __init__ decidir
 
     def __init__(self, seed=None, temperament=None, seed_ruido=None, tipos=None, ganho=None, tau_sinaptico=None,
                  gasta_corrente=None):
@@ -163,6 +165,7 @@ class BioBrain(Brain):
             tau_m[sl], adapt_b[sl], adapt_tau[sl] = tau, b, bt
         tau_m *= rng.uniform(0.9, 1.1, self.N)                  # heterogeneidade (o 1º sorteio, como no LIF)
         self._montar_neuronios(tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico, gasta_corrente)
+        self.numba = acelerado.DISPONIVEL and ajustes.NE_NUMBA      # o passo compilado (core/bio/acelerado.py)
 
         # ---------------- receptores sensoriais ----------------
         self.s_rate = np.zeros(Ns)
@@ -329,6 +332,8 @@ class BioBrain(Brain):
 
     def _substep(self):
         """Um passo de 1 ms: propaga os pulsos do passo anterior pelas sinapses, integra, dispara e habitua."""
+        if self.numba:
+            return self._substep_numba()
         rng = self.rng
         Ns = self.Ns
         if self.izhikevich is None:
@@ -361,6 +366,44 @@ class BioBrain(Brain):
         disparou[izh] = self.izhikevich.passo(exc[izh], inh[izh], ruido[izh],
                                               self._ausencia_izh if self.ausente else None, AUSENCIA_CORRENTE)
         return disparou
+
+    def _preparar_numba(self):
+        """Índices de cada grupo e máscara da ausência (R1) por grupo, para o passo compilado."""
+        if self.izhikevich is None:
+            lif, izh = np.arange(self.Nl), np.zeros(0, dtype=np.int64)
+        else:
+            lif, izh = self._locais_lif, self._locais_izh
+        self._nb_lif = np.ascontiguousarray(lif, dtype=np.int64)
+        self._nb_izh = np.ascontiguousarray(izh, dtype=np.int64)
+        self._nb_inib_lif = np.isin(self._nb_lif, self._idx_ausencia)
+        self._nb_inib_izh = np.isin(self._nb_izh, self._idx_ausencia)
+        self._nb_disparou = np.zeros(self.Nl, dtype=bool)
+        self._nb_vazio = np.zeros(self.Nl)
+
+    def _substep_numba(self):
+        """O mesmo passo de `_substep`, compilado: mesmos pulsos, na mesma ordem do gerador de ruído."""
+        if not hasattr(self, "_nb_lif"):
+            self._preparar_numba()
+        rng, s, nb = self.rng, self.sinapses, acelerado
+        disparou = self._nb_disparou
+        if self.izhikevich is None:
+            corrente = np.zeros(self.Nl)
+            nb.propagar(s.inicio, s.pre, s.pos, s.peso, self.spikes, self.pre_gain, corrente)
+            outra, somar = self._nb_vazio, False
+        else:
+            corrente, outra, somar = np.zeros(self.Nl), np.zeros(self.Nl), True
+            nb.propagar_por_sinal(s.inicio, s.pre, s.pos, s.peso, self.spikes, self.pre_gain, corrente, outra)
+        normal = rng.standard_normal(self.Nl)
+        n = self.neuronios
+        nb.lif(self._nb_lif, corrente, outra, somar, normal, ns.NOISE_SIGMA, self._nb_inib_lif, self.ausente,
+               AUSENCIA_CORRENTE, n.v, n.decay, n.ref, n.a, n.adapt_b, n.adapt_decay, ns.T_REF, disparou)
+        z = self.izhikevich
+        if z is not None:
+            nb.izhikevich(self._nb_izh, corrente, outra, normal, ns.NOISE_SIGMA, self._nb_inib_izh, self.ausente,
+                          AUSENCIA_CORRENTE, z.v, z.u, z.i_ampa, z.i_gaba, z.decai_ampa, z.decai_gaba,
+                          z._salto_ampa, z._salto_gaba, z.a, z.b, z.c, z.d, z.gasto, float(PICO), disparou)
+        nb.fechar(rng.random(self.Ns), self.s_prob, self.p, self.s_d, self.s_rec, disparou, self.spikes,
+                  self.trace, ns.TRACE_DECAY, self._pool_de, self.pool_counts)
 
     def step(self, dt_ms):
         """Avança a rede `dt_ms` milissegundos (em passos de 1 ms, no máximo 400 por chamada)."""

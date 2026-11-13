@@ -1,0 +1,4 @@
+# Opcional: o passo do BioBrain compilado com Numba (core/bio/acelerado.py), com os mesmos pulsos do numpy.
+# Sem isto o BioBrain usa o numpy. O Numba 0.68 tem rodas para Python 3.10 a 3.14 (não para 3.15).
+-r requirements.txt
+numba==0.68.1
