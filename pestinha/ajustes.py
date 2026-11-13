@@ -176,6 +176,12 @@ HOMEOSTASE_TETO = 0.5           # o replay para de empurrar uma sinapse em 50% d
 # suas marcas, aqui e em _LIMITES. A chave que liga a frente fica em config.FRENTES.
 # ---------------------------------------------------------------------------
 # >>> frente lar (dono: LAR-1, LAR-3)
+# O lar (LAR-1): um canto fixo com cama. Com sono chegando, ele vai para a cama e dorme lá.
+LAR_MARGEM_PRESSAO = 0.05       # sonolento: a pressão de sono a esta distância do limiar de dormir
+LAR_MARGEM_C = 0.1              # e o relógio a esta distância do limiar da noite (~25 min antes)
+LAR_VELOCIDADE_CAMA = 90.0      # px/s: com sono, ele vai devagar até a cama
+LAR_CHEGOU_CAMA = 14            # px do centro da cama: já está deitado nela
+LAR_VALIDADE_CAMA = 1.0         # s: o pedido de ir para a cama vale isso; sem o módulo renovar, ele esquece
 # <<< frente lar
 # >>> frente modelo_eu (dono: EU-1, EU-2)
 # <<< frente modelo_eu
@@ -286,6 +292,11 @@ _LIMITES = {
     "ZZZ_QUANTIDADE": (int, 0, 20),
     "ZZZ_PERIODO": (float, 0.1, 60.0),
     # >>> frente lar
+    "LAR_MARGEM_PRESSAO": (float, 0.0, 0.5),
+    "LAR_MARGEM_C": (float, 0.0, 1.0),
+    "LAR_VELOCIDADE_CAMA": (float, 10.0, 1000.0),
+    "LAR_CHEGOU_CAMA": (int, 1, 200),
+    "LAR_VALIDADE_CAMA": (float, 0.1, 10.0),
     # <<< frente lar
     # >>> frente modelo_eu
     # <<< frente modelo_eu

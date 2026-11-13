@@ -9,11 +9,14 @@ Divisão de trabalho (v7.1):
 Ele não tem pernas: "andar" é deslizar, "pular" é um impulso.
 Estados de missão (entregar meme, atravessar a tela) passam na frente do
 passeio normal; cair, ser segurado ou estar tombado passam na frente de tudo.
+Com sono chegando, o lar (mind/lar_ctl.py, frente desligada por padrão) pede que ele vá
+para a cama: o pedido passa na frente da bolinha e do passeio, e atrás de missão e protesto.
 """
 
 import math
 import random
 
+from .. import ajustes
 from ..core.physics import CLOSE_BUTTONS, GRAVITY, wrap_angle
 
 STILL = ("assustado", "dramatico", "dormindo")     # emoções que não passeiam
@@ -55,6 +58,7 @@ class Behavior:
         self.march_dir = 1
         self.next_glance = 0.0
         self.screen_areas = []      # áreas de todos os monitores, atualizadas pelo app
+        self.cama = None            # (x da cama, válido até): o lar pede que ele vá deitar (None: não pede)
 
     def look_at(self, x, y, now):
         """Olha para um ponto da tela por alguns segundos."""
@@ -235,6 +239,13 @@ class Behavior:
             self._protest_move(dt, now, left, right)
             return
 
+        # sono chegando: vai devagar para a cama e fica lá (o pedido vence se o lar não renovar)
+        if self.cama is not None and now > self.cama[1]:
+            self.cama = None
+        if self.cama is not None and self.emotion not in STILL and self._alcanca(self.cama[0], left, right):
+            self._ir_para_cama(self.cama[0], platforms, left, right)
+            return
+
         # brincar com a bolinha (chutar ou arremessar, conforme o estilo do pet)
         if self.play is not None and self.ball is not None and self.emotion not in STILL and not st.at_desk:
             if self.play.tick(now, body, self.ball, cursor, self.emotion, self.play_pull):
@@ -266,6 +277,38 @@ class Behavior:
             else:
                 speed = max(CROSS_SCREEN_SPEED, tone.speed()) if self.crossing_screen else tone.speed()
                 self._slide_to(self.target_x, speed)
+
+    def _alcanca(self, x, left, right):
+        """Diz se dá para chegar a x andando: neste monitor ou num vizinho encostado ao lado."""
+        walk_left, walk_right = self._movement_limits(left, right)
+        return walk_left <= x <= walk_right
+
+    def _ir_para_cama(self, x_cama, platforms, left, right):
+        """
+        Anda até a cama. Numa janela bem em cima dela, desce primeiro pela beirada mais perto que dá
+        para alcançar (uma janela encostada na borda da tela só tem a outra). Devolve True quando está
+        deitado (no chão, perto do meio da cama).
+        """
+        body = self.body
+        alvo = x_cama
+        if body.platform is not None:
+            plat = next((p for p in platforms if p[0] == body.platform), None)
+            if plat is not None:
+                esquerda, direita = plat[1], plat[2] - CLOSE_BUTTONS
+                if esquerda <= x_cama <= direita:
+                    ex, _ey = body.extents()
+                    walk_left, walk_right = self._movement_limits(left, right)
+                    beiradas = [x for x in (esquerda - 40, direita + 40) if walk_left + ex < x < walk_right - ex]
+                    if not beiradas:                    # não há por onde descer: fica onde está
+                        body.vx = 0.0
+                        return False
+                    alvo = min(beiradas, key=lambda x: abs(x - body.x))
+        elif abs(body.x - x_cama) < ajustes.LAR_CHEGOU_CAMA:
+            body.vx = 0.0
+            self.target_x = None
+            return True
+        self._slide_to(alvo, ajustes.LAR_VELOCIDADE_CAMA)
+        return False
 
     def walk_to(self, x, speed):
         """Anda até x (usado por quem decide para onde ele vai, como a fuga do cantinho)."""
