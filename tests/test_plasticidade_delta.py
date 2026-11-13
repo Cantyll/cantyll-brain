@@ -6,7 +6,7 @@ Os fenômenos da spec, seção 10: aprendizado por erro de predição, bloqueio,
 (test_bio_dinamica.py); aqui só se confere que a plasticidade nova não mexe nela.
 
 Sem Qt: só o BioBrain. Os testes não passam pulsos pela rede, porque o aprendizado depende dos níveis
-sensoriais, da elegibilidade e de δ. A ACh fica fixa em 0,5 (fator 1) onde o teste não é sobre ela.
+sensoriais, da elegibilidade e de δ. A ACh e a média dela ficam fixas em 0,5 (fator 1) onde o teste não é sobre ela.
 """
 import numpy as np
 import pytest
@@ -24,10 +24,16 @@ def pl1(monkeypatch):
     monkeypatch.setattr(ajustes, "PL_DELTA", True)
 
 
+@pytest.fixture
+def ach_ligada(monkeypatch):
+    monkeypatch.setattr(ajustes, "PL_ACH", True)
+
+
 def _cerebro(ach=0.5):
     brain = BioBrain(seed=7, seed_ruido=1)
     if brain.plasticidade is not None:
         brain.plasticidade.neuromod.ach_fixa = ach
+        brain.plasticidade.neuromod.ach_media_fixa = 0.5     # fator = (0,5 + ACh) / 1
     return brain
 
 
@@ -208,7 +214,7 @@ def test_habituacao_nao_muda(pl1):
 
 # ---------------- ACh ----------------
 
-def test_ach_muda_a_taxa(pl1):
+def test_ach_muda_a_taxa(pl1, ach_ligada):
     """η_eff = η · (0,5 + ACh): com ACh 1 o mesmo evento ensina 3 vezes o que ensina com ACh 0."""
     pesos = {}
     for ach in (0.0, 1.0):
@@ -216,6 +222,13 @@ def test_ach_muda_a_taxa(pl1):
         _tentativa(brain, {}, contexto={"WORK": 1.0})
         pesos[ach] = _peso(brain, "WORK")
     assert pesos[1.0] == pytest.approx(3.0 * pesos[0.0], rel=1e-9)
+
+
+def test_ach_desligada_por_padrao_nao_muda_a_taxa(pl1):
+    """PL_ACH desligada (padrão): a ACh é medida, mas o fator é 1, com ACh 0 ou 1."""
+    assert ajustes.PL_ACH is False
+    for ach in (0.0, 1.0):
+        assert _cerebro(ach=ach).plasticidade.neuromod.fator_aprendizado() == 1.0
 
 
 def test_ach_segue_o_focus(pl1):
@@ -228,7 +241,33 @@ def test_ach_segue_o_focus(pl1):
     assert neuromod.ach == pytest.approx(np.exp(-1.0), rel=1e-3)
 
 
-def test_replay_nao_usa_a_ach(pl1):
+def test_ach_normalizada_pela_media_nao_muda_o_quanto_aprende_no_dia(pl1, ach_ligada):
+    """
+    A média lenta divide a taxa: um dia com 30% programando (ACh 1) e 70% à toa (ACh 0) aprende, na soma, o
+    mesmo que um dia de ACh constante. Muda quando ele aprende, não quanto (regra 8).
+    """
+    brain = BioBrain(seed=7, seed_ruido=1)
+    neuromod = brain.plasticidade.neuromod
+    neuromod.ach_media = 0.3
+    soma = 0.0
+    for _ in range(1000):
+        for focus, fracao in ((ajustes.PL_ACH_REF_HZ, 0.3), (0.0, 0.7)):
+            neuromod.atualizar(focus, fracao * 60.0)
+            soma += neuromod.fator_aprendizado() * fracao
+    assert soma / 1000 == pytest.approx(1.0, abs=0.1)
+
+
+def test_media_da_ach_vai_e_volta_no_save(pl1, tmp_path):
+    brain = _cerebro()
+    brain.plasticidade.neuromod.ach_media_fixa = None
+    brain.plasticidade.neuromod.ach_media = 0.42
+    brain.save(tmp_path / "rede.json")
+    outro = BioBrain(seed=7, seed_ruido=1)
+    assert outro.load(tmp_path / "rede.json")
+    assert outro.plasticidade.neuromod.ach_media == pytest.approx(0.42)
+
+
+def test_replay_nao_usa_a_ach(pl1, ach_ligada):
     """No replay a taxa não depende da ACh."""
     pesos = {}
     for ach in (0.0, 1.0):

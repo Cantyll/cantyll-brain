@@ -40,8 +40,10 @@ O que é suposição, e não medida de uso real:
   sem travessura na tela (a do tédio vai para o canto dele).
 - O PL-1 (--pl1): o BioBrain com δ = r − V e a ACh na taxa. O crítico lê só as pistas (PEDIDO, ANTICIPATE e
   outras; ajustes.PL_CANAIS_CRITICO), e nenhum contexto daqui tem pista, então V fica em zero e δ = r·dt, a
-  mesma conta de antes. O que muda é a ACh: cada contexto tem a dele, tirada da taxa do FOCUS num gêmeo da
-  rede no dia 0 (ACH_CONTEXTO), porque o dia comprimido não roda os pulsos. No replay a ACh não entra.
+  mesma conta de antes. A ACh só entra com ajustes.PL_ACH (desligada por padrão: com ela a regra 8 falha no
+  misto e no carinhoso). Ligada, é o que muda: cada contexto tem a dele, tirada da taxa do FOCUS num gêmeo da
+  rede no dia 0 (ach_dos_contextos), porque o dia comprimido não roda os pulsos, e a média lenta é a média
+  dos contextos pelo peso de cada um no dia. No replay a ACh não entra.
 - As bagunças do "so_o_lar" (só com --pl1 elas ensinam): BAGUNCAS_POR_DIA travessuras de casa por dia,
   cada uma num contexto com tédio, sorteado pelo peso do contexto. O tédio cai como no app (+0,25 de
   estimulação; homeostasis.py) e a recompensa LAR_RECOMPENSA_TEDIO × alívio é paga em LAR_DURACAO_BAGUNCA,
@@ -401,6 +403,9 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
         habituacao = Habituacao(ajustes.HABITUACAO_DISPENSA, ajustes.RECUPERACAO_DISPENSA_H * 3600.0)
         teto = TetoCarinho() if (regras.get("lar", False) if lar is None else lar) else None
         ach = ach_dos_contextos(brain)
+        if ach:                                 # a média do dia: cada contexto pelo peso dele no dia
+            pesos = {nome: peso for nome, _, peso in CONTEXTOS}
+            brain.plasticidade.neuromod.ach_media_fixa = sum(pesos[n] * v for n, v in ach.items()) / sum(pesos.values())
         j = {post: k for k, post in enumerate(brain.plastic_posts)}
         pressoes = np.linspace(PRESSAO_AO_DORMIR, ajustes.LIMIAR_ACORDA_PRESSAO, int(sonos) + 1)
         base = None
