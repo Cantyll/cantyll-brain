@@ -147,6 +147,9 @@ NE_GANHO_CALM = 0.92
 NE_GANHO_TIRED = 0.957
 NE_GANHO_FRUSTRATION = 1.04
 NE_GANHO_GLOOM = 0.894
+# Numba (decisão do Cantyll, 2026-11-13, opção C): com o Numba instalado (requirements-numba.txt), o passo do BioBrain
+# roda compilado, com os mesmos pulsos do numpy (core/bio/acelerado.py). Sem o Numba, ou com False, fica o numpy.
+NE_NUMBA = True
 # <<< decisões
 
 # ---------------------------------------------------------------------------

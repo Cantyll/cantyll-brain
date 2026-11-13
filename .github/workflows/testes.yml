@@ -29,6 +29,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends libegl1
       # Só o necessário para os testes: sem PyInstaller (o executável é gerado à parte).
       - run: pip install -r requirements.txt pytest==8.4.2 pyflakes==4.1.0
+      # Com o cérebro bio, a suíte roda com o passo compilado (Numba); com o lif, o BioBrain fica no numpy.
+      - name: Instalar o Numba (só com o cérebro bio)
+        if: matrix.cerebro == 'bio'
+        run: pip install -r requirements-numba.txt
       - run: python -m pyflakes pestinha tests main.py ferramentas conftest.py
       - name: Verificar versão de PySide6 no Linux
         if: runner.os == 'Linux'
