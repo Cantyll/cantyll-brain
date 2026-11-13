@@ -132,3 +132,32 @@ def test_trinta_noites_gloom_nos_cenarios_com_carinho_dentro_do_criterio(cenario
     ultimo = simular_noites.simular(cenario, noites=30, semente=7, dias=())[-1]
     assert ultimo["dia"] == 30
     assert ultimo["uso_hz"]["GLOOM"] <= LIMITE_GLOOM_DIA_30_HZ[cenario]
+
+
+# ---------------- frente lar (teto do carinho) ----------------
+
+def test_sem_lar_o_cenario_com_carinho_nao_muda():
+    padrao = simular_noites.simular("misto", noites=2, semente=3, dias=(2,))
+    assert simular_noites.simular("misto", noites=2, semente=3, dias=(2,), lar=False) == padrao
+    com_lar = simular_noites.simular("misto", noites=2, semente=3, dias=(2,), lar=True)
+    assert com_lar != padrao                            # o teto tira parte do que o carinho ensina
+
+
+def test_so_o_lar_roda_e_liga_o_lar_sozinho():
+    linhas = simular_noites.simular("so_o_lar", noites=2, semente=3, dias=(2,))
+    assert [linha["dia"] for linha in linhas] == [0, 2]
+    assert simular_noites.CENARIOS["so_o_lar"]["lar"] is True
+
+
+def test_teto_da_simulacao_e_o_mesmo_calculo_do_lar():
+    from pestinha.mind.lar_ctl import LarModulo
+    relogio = [0.0]
+    lar = LarModulo.__new__(LarModulo)
+    lar.carga_carinho, lar.carga_em, lar.relogio = 0.0, None, lambda: relogio[0]
+    teto = simular_noites.TetoCarinho()
+    for agora, segundos in ((0.0, 4.0), (60.0, 3.0), (5000.0, 5.0), (40000.0, 2.0)):
+        for k in range(int(segundos * 10)):
+            relogio[0] = agora + 0.1 * k
+            esperado = 1.0 + lar.ajustar_recompensa(0.0, {"carinho": 1.0}, 0.1)
+            assert teto.peso(relogio[0]) == pytest.approx(esperado)
+            teto.carga += 0.1
