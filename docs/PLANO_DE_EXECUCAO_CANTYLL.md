@@ -121,6 +121,8 @@ class Modulo:
 Depois do T1, nenhuma frente edita `app.py`, `config.py` nem `paths.py`. Depois do T2, só a frente NE edita
 `core/bio/rede.py`.
 
+Exceção aceita pelo Cantyll em 2026-11-13 (opção A): o PR #18 (gatilho de negligência de 10 min) edita `app.py` em `think()` e na chamada de `definir_ausencia`, porque o registro não tem gancho de interação nem de ausência. Ela vale só para esse PR. Outro toque em `app.py` depois do T1 pede decisão própria.
+
 ### Onda 2: frentes em paralelo (depois do portão A)
 
 | ID | Rótulo | Conteúdo | Arquivos de que é dono | Depende de | Pronto quando |
@@ -177,7 +179,7 @@ A frente NE é uma fila: uma thread só, do NE-1 ao NE-4. Ela pode atravessar a 
 | Arquivo | Quem pode editar | Regra |
 |---|---|---|
 | `core/nervous_system.py` | #5, B2 (só `taxas()`); depois só o T2, na função `criar_cerebro` | Congelado depois do B2 (decisão V1) |
-| `app.py` | #5, depois só o T1 | Frente nova entra pelo registro de módulos |
+| `app.py` | #5, depois só o T1; #18 por exceção aceita em 2026-11-13, só para esse PR | Frente nova entra pelo registro de módulos |
 | `ajustes.py` | #5, B4 (comentários), T1; depois cada frente só na própria seção reservada, e a NE na seção de decisões | O T1 cria as seções, com marcas de início e fim, também dentro de `_LIMITES` |
 | `config.py` | T1 (chaves e permissões de todas as frentes, escondidas enquanto a chave está desligada), T2 (`CEREBROS_PRONTOS`) | Ligar por padrão é PR à parte |
 | `paths.py` | T1 | Estado novo usa a pasta por módulo |
