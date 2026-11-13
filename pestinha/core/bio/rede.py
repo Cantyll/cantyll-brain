@@ -31,6 +31,7 @@ from .. import nervous_system as ns
 from ..homeostase_sinaptica import downscaling, saturacao
 from ..nervous_system import Brain, LEARN_MAX, LEARN_MIN, LEARN_RATE_PADRAO
 from .neuronios import Neuronio
+from . import plasticidade as pl
 from .projecoes import compilar, projecao_de_bloco
 
 BIO_VERSION = 1
@@ -194,6 +195,10 @@ class BioBrain(Brain):
         self.raster = deque(maxlen=ns.RASTER_BINS)
         self._bin = np.zeros(self.N, dtype=bool)
 
+        # PL-1: δ = r − V e ACh (core/bio/plasticidade.py). None com ajustes.PL_DELTA desligado: aprende como o LIF.
+        self.plasticidade = pl.criar(self.sensory_names)
+        self._em_replay = False
+
     # ---------------- populações ----------------
 
     def pool(self, name):
@@ -324,6 +329,7 @@ class BioBrain(Brain):
                 for i, c in enumerate(self.sensory_names)
             },
             "taxas": self.pool_rates(),
+            **({"plasticidade": self.plasticidade.estado()} if self.plasticidade is not None else {}),
         }
 
     # ---------------- aprendizado ----------------
@@ -336,10 +342,18 @@ class BioBrain(Brain):
         """
         k = 1.0 - math.exp(-dt_s / ns.ELIGIBILITY_TAU)
         self.eligibility += (self._levels - self.eligibility) * k
-        delta_predicao = reward - expected
-        if delta_predicao == 0.0:
-            return
-        change = rate * delta_predicao * dt_s * np.outer(self.eligibility, self.post_sign)
+        if self.plasticidade is not None:
+            # PL-1: δ = r − V, com V do crítico (somado ao expected de um módulo) e a taxa vezes (0,5 + ACh)
+            focus = self.pool_rate[self._pool_index["FOCUS"]]
+            delta, fator = self.plasticidade.passo(self._levels, self.eligibility, reward, expected, dt_s, focus, self._em_replay)
+            if delta == 0.0:
+                return
+            change = rate * fator * delta * np.outer(self.eligibility, self.post_sign)
+        else:
+            delta_predicao = reward - expected
+            if delta_predicao == 0.0:
+                return
+            change = rate * delta_predicao * dt_s * np.outer(self.eligibility, self.post_sign)
         if teto is not None:
             change = change * saturacao(change, self.learned, teto, LEARN_MAX, LEARN_MIN)
         self.learned = np.clip(self.learned + change, LEARN_MIN, LEARN_MAX)
@@ -356,17 +370,23 @@ class BioBrain(Brain):
         """
         entrada = {k: v for k, v in sentidos.items() if k in self.sensory_names}
         restante = int(ms)
-        while restante > 0:
-            chunk = min(100, restante)
-            self.stimulate(entrada)
-            self.step(chunk)
-            self.learn(delta, 0.0, chunk / 1000.0, rate, teto)
-            restante -= chunk
+        self._em_replay = True                  # PL-1: no replay, a ACh não muda a taxa (core/bio/moduladores.py)
+        try:
+            while restante > 0:
+                chunk = min(100, restante)
+                self.stimulate(entrada)
+                self.step(chunk)
+                self.learn(delta, 0.0, chunk / 1000.0, rate, teto)
+                restante -= chunk
+        finally:
+            self._em_replay = False
 
     def downscaling_sono(self, fracao):
         """Homeostase sináptica (SHY, decisão D4): o sono desfaz `fracao` de todas as sinapses aprendidas."""
         self.learned = downscaling(self.learned, fracao)
         self._apply_learning()
+        if self.plasticidade is not None:
+            self.plasticidade.downscaling(fracao)   # PL-1: o crítico perde o mesmo (core/bio/plasticidade.py)
 
     # ---------------- persistência ----------------
 
@@ -388,6 +408,8 @@ class BioBrain(Brain):
                 for i, c in enumerate(self.sensory_names)
             },
         }
+        if self.plasticidade is not None:
+            data["plasticidade"] = self.plasticidade.estado()     # PL-1: crítico e ACh (campo opcional)
         write_json(path, data)
 
     def load(self, path):
@@ -429,6 +451,10 @@ class BioBrain(Brain):
                     return False
                 recuperado[name] = np.clip(1.0 - (1.0 - saved) * np.exp(-elapsed / self.s_tau_rec[sl]), 0.0, 1.0)
 
+            if self.plasticidade is not None and "plasticidade" in data:
+                # PL-1: crítico e ACh. Inválido: nada muda (nem o resto). Ausente (save sem PL-1): crítico do zero.
+                if not self.plasticidade.carregar(data["plasticidade"]):
+                    return False
             self.learned[:] = learned
             self._apply_learning()
             for name, valores in recuperado.items():

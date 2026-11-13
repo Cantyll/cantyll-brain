@@ -23,7 +23,11 @@ A parte de necessidades da opção A (lazer no lar, decidida pelo Cantyll em 202
       uma carga que vaza (τ = LAR_RECUPERACAO_CARINHO_H); o reforço vale 0,5 ** (carga / meia-vida).
       Como a habituação à dispensa, a carga vive só na memória do processo: reabrir o app zera.
 
-Não toca a rede: nenhum canal novo, nenhuma recompensa (o reforço do lar espera o PL-1, regra R2).
+Reforço do lar (PL-1, opção A do Cantyll em 2026-11-13): o tédio que a travessura de casa tira vira
+recompensa. A recompensa total é LAR_RECOMPENSA_TEDIO vezes o tédio aliviado (o canal BOREDOM antes menos
+depois), paga por igual ao longo de LAR_DURACAO_BAGUNCA pelo encaixe ajustar_recompensa. Só existe com a
+plasticidade do PL-1 ligada no cérebro (ajustes.PL_DELTA, cérebro "bio"): ali a recompensa passa por δ e,
+prevista, para de ensinar (R2). Sem ela, o lar segue sem recompensa, como antes. Nenhum canal novo.
 Na pausa e no pânico o app não chama o módulo; o pedido de ir para a cama vence em
 LAR_VALIDADE_CAMA e ele volta ao passeio normal se o módulo sair do registro por defeito.
 """
@@ -75,6 +79,9 @@ class _SegueOPet(QObject):
 class LarModulo(Modulo):
     """A frente lar: a cama e o caminho até ela."""
     nome = "lar"
+    tedio_antes = None              # BOREDOM no começo da bagunça; o alívio é medido no passo seguinte
+    reforco_restante = 0.0          # recompensa do alívio do tédio ainda a pagar
+    reforco_taxa = 0.0              # recompensa por segundo enquanto paga
 
     def __init__(self, app, cama=None):
         """Cria a cama (escondida até o pet aparecer) e liga a visibilidade dela à do pet."""
@@ -99,6 +106,7 @@ class LarModulo(Modulo):
             return False
         self.bagunca_ate = now + ajustes.LAR_DURACAO_BAGUNCA
         self.baguncas += 1
+        self.tedio_antes = self.app.drives.channels()["BOREDOM"]
         self.cama.set_baguncada(True)
         self.app.behavior.cama = (self.cama.centro_x(), self.bagunca_ate, "bagunca")
         return True
@@ -136,13 +144,40 @@ class LarModulo(Modulo):
         return 1.0 if meia <= 0 else 0.5 ** (self._carga_agora() / meia)
 
     def ajustar_recompensa(self, recompensa, fontes, dt):
-        """Teto do carinho: tira da recompensa a parte do carinho que já não ensina. Sem carinho, não mexe."""
+        """
+        Teto do carinho: tira da recompensa a parte do carinho que já não ensina. Reforço do lar: soma a recompensa
+        do tédio que a bagunça tirou (só com o PL-1). Sem carinho e sem alívio a pagar, não mexe.
+        """
+        novo = None
         carinho = fontes.get("carinho", 0.0)
-        if carinho <= 0.0 or ajustes.LAR_MEIA_VIDA_CARINHO_S <= 0:
-            return None
-        peso = self.peso_carinho()
-        self.carga_carinho += max(0.0, dt)
-        return recompensa - carinho * (1.0 - peso)
+        if carinho > 0.0 and ajustes.LAR_MEIA_VIDA_CARINHO_S > 0:
+            peso = self.peso_carinho()
+            self.carga_carinho += max(0.0, dt)
+            novo = recompensa - carinho * (1.0 - peso)
+        lar = self.reforco_do_lar(dt)
+        if lar:
+            novo = (recompensa if novo is None else novo) + lar
+        return novo
+
+    def reforco_do_lar(self, dt):
+        """A parte deste passo da recompensa pelo tédio aliviado (0 sem o PL-1 ou sem bagunça recente)."""
+        if self.tedio_antes is None and self.reforco_restante <= 0.0:
+            return 0.0
+        if getattr(self.app.brain, "plasticidade", None) is None:
+            self.tedio_antes = None
+            self.reforco_restante = 0.0
+            return 0.0
+        if self.tedio_antes is not None:
+            alivio = max(0.0, self.tedio_antes - self.app.drives.channels()["BOREDOM"])
+            self.tedio_antes = None
+            duracao = max(ajustes.LAR_DURACAO_BAGUNCA, 1e-6)
+            self.reforco_restante = ajustes.LAR_RECOMPENSA_TEDIO * alivio
+            self.reforco_taxa = self.reforco_restante / duracao
+        if self.reforco_restante <= 0.0 or dt <= 0.0:
+            return 0.0
+        pago = min(self.reforco_restante, self.reforco_taxa * dt)
+        self.reforco_restante -= pago
+        return pago / dt
 
     def ao_dormir(self, cerebro):
         """Conta onde o sono começou."""
@@ -151,6 +186,7 @@ class LarModulo(Modulo):
         self.cama.set_ocupada(na_cama)
         self.cama.set_baguncada(False)          # foi dormir: a cama fica arrumada
         self.bagunca_ate = 0.0
+        self.reforco_restante = 0.0             # dormiu: o reforço da bagunça acaba junto
 
     def ao_acordar(self, cerebro):
         """Acordou: o cobertor volta."""

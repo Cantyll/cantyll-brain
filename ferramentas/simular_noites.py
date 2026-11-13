@@ -12,6 +12,7 @@ aprendizado faz em semanas: se alguma população morre (PLAYFUL) ou satura (GLO
     python ferramentas/simular_noites.py --cerebro bio        # o mesmo com o BioBrain (core/bio)
     python ferramentas/simular_noites.py --lar                # com a frente lar ligada (teto do carinho)
     python ferramentas/simular_noites.py --cenario so_o_lar   # lar ligado e você sem interagir
+    python ferramentas/simular_noites.py --pl1                # BioBrain com a plasticidade do PL-1 (δ = r − V e ACh)
 
 É critério de aceitação de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase
 (tests/test_simulacao_noites.py roda uma versão dela). Com a mesma semente, o resultado se repete.
@@ -37,6 +38,15 @@ O que é suposição, e não medida de uso real:
   episódio, e a carência não entra na rede pelo aprendizado, então nenhuma das duas muda as sinapses.
   O cenário "so_o_lar" é o lar ligado com você presente e sem interagir: sem dispensa, sem carinho e
   sem travessura na tela (a do tédio vai para o canto dele).
+- O PL-1 (--pl1): o BioBrain com δ = r − V e a ACh na taxa. O crítico lê só as pistas (PEDIDO, ANTICIPATE e
+  outras; ajustes.PL_CANAIS_CRITICO), e nenhum contexto daqui tem pista, então V fica em zero e δ = r·dt, a
+  mesma conta de antes. O que muda é a ACh: cada contexto tem a dele, tirada da taxa do FOCUS num gêmeo da
+  rede no dia 0 (ACH_CONTEXTO), porque o dia comprimido não roda os pulsos. No replay a ACh não entra.
+- As bagunças do "so_o_lar" (só com --pl1 elas ensinam): BAGUNCAS_POR_DIA travessuras de casa por dia,
+  cada uma num contexto com tédio, sorteado pelo peso do contexto. O tédio cai como no app (+0,25 de
+  estimulação; homeostasis.py) e a recompensa LAR_RECOMPENSA_TEDIO × alívio é paga em LAR_DURACAO_BAGUNCA,
+  como em mind/lar_ctl.py. Quantas bagunças ele faz por dia ninguém mediu: 20 é a mesma conta das
+  travessuras do cenário duro, que agora iriam para o canto dele.
 - A noite picada (--sonos N): a mesma queda de pressão, repartida por igual em N sonos. Entre um e outro
   ele acorda (carinho, susto, o app reaberto) e adormece de novo na hora. Cada adormecer monta a fila de
   replay outra vez, como no app.
@@ -62,6 +72,7 @@ import numpy as np  # noqa: E402
 from pestinha import ajustes  # noqa: E402
 from pestinha import config  # noqa: E402
 from pestinha.core import episodic  # noqa: E402
+from pestinha.core import homeostasis  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
 from pestinha.core.episodic import EpisodicMemory  # noqa: E402
 from pestinha.core.habituacao import Habituacao  # noqa: E402
@@ -90,8 +101,9 @@ CENARIOS = {
                    "descricao": "o cenário duro com a taxa de aprendizado do modo teste (4 vezes a normal)"},
     "carinhoso": {"dispensas": 3, "aceitas": 10, "carinhos": 25, "perfil": "normal",
                   "descricao": "3 dispensas, 10 aceitas e 25 carinhos por dia"},
-    "so_o_lar": {"dispensas": 0, "aceitas": 0, "carinhos": 0, "perfil": "normal", "lar": True,
-                 "descricao": "lar ligado e você sem interagir: nada na tela, nenhuma dispensa, nenhum carinho"},
+    "so_o_lar": {"dispensas": 0, "aceitas": 0, "carinhos": 0, "baguncas": 20, "perfil": "normal", "lar": True,
+                 "descricao": "lar ligado e você sem interagir: nada na tela, nenhuma dispensa, nenhum carinho, "
+                              "20 travessuras de casa"},
 }
 
 PRESSAO_AO_DORMIR = 0.82        # P de quem ficou ~14 h acordado depois de acordar em 0,25 (ritmo.py)
@@ -115,11 +127,15 @@ class _ReplaySemPulsos:
     def replay(self, sentidos, ms, delta, rate=ns.LEARN_RATE_PADRAO, teto=None):
         entrada = {k: v for k, v in sentidos.items() if k in self.sensory_names}
         restante = int(ms)
-        while restante > 0:
-            chunk = min(100, restante)
-            self.stimulate(entrada)
-            self.learn(delta, 0.0, chunk / 1000.0, rate, teto)
-            restante -= chunk
+        self._em_replay = True                  # PL-1: no replay a ACh não entra (como em BioBrain.replay)
+        try:
+            while restante > 0:
+                chunk = min(100, restante)
+                self.stimulate(entrada)
+                self.learn(delta, 0.0, chunk / 1000.0, rate, teto)
+                restante -= chunk
+        finally:
+            self._em_replay = False
 
 
 class _RedeDeSimulacao(_ReplaySemPulsos, LIFBrain):
@@ -215,21 +231,76 @@ def _carinho(brain, sentidos, segundos, taxa, teto=None, agora=0.0):
             teto.carga += 0.1
 
 
-def simular_dia(brain, memoria, rng, cenario, perfil, habituacao=None, relogio=None, inicio_s=0.0, teto=None):
+def _bagunca(brain, sentidos, taxa):
+    """
+    Uma travessura de casa (mind/lar_ctl.py): o tédio cai como no app (+0,25 de estimulação) e a recompensa
+    LAR_RECOMPENSA_TEDIO × alívio é paga por igual em LAR_DURACAO_BAGUNCA. Sem o PL-1, não há recompensa (R2).
+    """
+    if getattr(brain, "plasticidade", None) is None:
+        return
+    antes = sentidos.get("BOREDOM", 0.0)
+    estimulacao = homeostasis.BORED_BELOW * (1.0 - antes) + homeostasis.STIMULUS["mischief"]
+    depois = min(1.0, max(0.0, (homeostasis.BORED_BELOW - estimulacao) / homeostasis.BORED_BELOW))
+    passos = max(1, int(round(ajustes.LAR_DURACAO_BAGUNCA * 10)))
+    recompensa = ajustes.LAR_RECOMPENSA_TEDIO * max(0.0, antes - depois) / (passos * 0.1)
+    momento = dict(sentidos, BOREDOM=depois)
+    for _ in range(passos):
+        brain.stimulate(momento)
+        brain.learn(recompensa, 0.0, 0.1, taxa)
+
+
+def _sorteia_contexto_com_tedio(rng):
+    """Um contexto com tédio, pelo peso dele (a travessura de casa vem do tédio)."""
+    com_tedio = [c for c in CONTEXTOS if c[1].get("BOREDOM", 0.0) > 0]
+    pesos = np.array([peso for _, _, peso in com_tedio])
+    nome, sentidos, _ = com_tedio[int(rng.choice(len(com_tedio), p=pesos / pesos.sum()))]
+    return nome, dict(sentidos)
+
+
+def ach_dos_contextos(brain):
+    """
+    PL-1: a ACh de cada contexto, pela taxa do FOCUS num gêmeo da rede sem nada aprendido (o dia comprimido
+    não roda os pulsos). {} se o cérebro não tem a plasticidade do PL-1.
+    """
+    if getattr(brain, "plasticidade", None) is None:
+        return {}
+    ach = {}
+    for nome, sentidos, _ in CONTEXTOS:
+        gemeo = BioBrain(seed=brain.seed, temperament=brain.temperament, seed_ruido=MEDIDA_SEMENTE)
+        gemeo.stimulate(sentidos)
+        for _ in range(MEDIDA_AQUECE_MS // 100):
+            gemeo.step(100)
+        antes = gemeo.disparos.copy()
+        for _ in range(MEDIDA_MS // 100):
+            gemeo.step(100)
+        foco = gemeo.pool("FOCUS")
+        hz = float((gemeo.disparos - antes)[gemeo._pool_index["FOCUS"]] / (foco["n"] * MEDIDA_MS / 1000.0))
+        ach[nome] = min(1.0, max(0.0, hz / ajustes.PL_ACH_REF_HZ))
+    return ach
+
+
+def simular_dia(brain, memoria, rng, cenario, perfil, habituacao=None, relogio=None, inicio_s=0.0, teto=None,
+                ach=None):
     """
     Um dia comprimido: os eventos do cenário, em ordem sorteada, cada um num contexto sorteado.
     habituacao: a Habituacao do app (None: toda dispensa pesa 1). relogio: o sorteio das horas (só a
     habituação e o teto usam; separado de rng para não mudar o resto). inicio_s: a hora em que o dia começa.
-    teto: o TetoCarinho do lar (None: sem a frente lar).
+    teto: o TetoCarinho do lar (None: sem a frente lar). ach: {contexto: ACh} do PL-1 (None ou {}: sem PL-1).
     """
     taxa = perfil["learn_rate"]
     eventos = ["dispensa"] * cenario["dispensas"] + ["aceita"] * cenario["aceitas"] + ["carinho"] * cenario["carinhos"]
+    eventos += ["bagunca"] * cenario.get("baguncas", 0)
     rng.shuffle(eventos)
     horas = (np.sort(relogio.uniform(0.0, DIA_ACORDADO_S, len(eventos))) if relogio is not None
              else np.zeros(len(eventos)))
     for evento, hora in zip(eventos, horas):
-        atividade, sentidos = _sorteia_contexto(rng)
+        atividade, sentidos = (_sorteia_contexto_com_tedio(rng) if evento == "bagunca" else _sorteia_contexto(rng))
+        if ach:
+            brain.plasticidade.neuromod.ach_fixa = ach[atividade]
         _assenta(brain, sentidos)
+        if evento == "bagunca":
+            _bagunca(brain, sentidos, taxa)
+            continue
         if evento == "carinho":
             _carinho(brain, sentidos, float(rng.uniform(2.0, 5.0)), taxa, teto, inicio_s + float(hora))
             if habituacao is not None:
@@ -297,18 +368,23 @@ def medir(brain):
 
 
 def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, sonos=1, cerebro="lif",
-            lar=None, **trocas):
+            lar=None, pl1=False, **trocas):
     """
     Roda `noites` dias e noites. dias: em quais manhãs medir (padrão DIAS_PADRAO; o dia 0 e o último entram sempre).
     pulsos: True simula os pulsos no replay, como o app (mais lento, mesmas sinapses no LIFBrain).
     sonos: em quantos sonos cada noite é picada (1: a noite inteira de uma vez).
     cerebro: "lif" (LIFBrain) ou "bio" (BioBrain).
     lar: True liga a frente lar (o teto do carinho). None: o que o cenário disser (só "so_o_lar" liga).
+    pl1: True liga a plasticidade do PL-1 (ajustes.PL_DELTA) no BioBrain; exige cerebro="bio".
     trocas: valores de ajustes.py só para esta simulação (por exemplo HOMEOSTASE_SHY=0.0, para comparar).
     Devolve uma lista de linhas (dict), uma por manhã medida. A última traz também "aprendido".
     """
     regras = CENARIOS[cenario] if isinstance(cenario, str) else cenario
     perfil = config.PROFILES[regras["perfil"]]
+    if pl1:
+        if cerebro != "bio":
+            raise ValueError("o PL-1 só existe no BioBrain: use cerebro='bio'")
+        trocas = dict(trocas, PL_DELTA=True)
     dias = set(DIAS_PADRAO if dias is None else dias) | {0, noites}
     linhas = []
     with contextlib.ExitStack() as pilha:
@@ -324,6 +400,7 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
         relogio = np.random.default_rng(semente + 2000)
         habituacao = Habituacao(ajustes.HABITUACAO_DISPENSA, ajustes.RECUPERACAO_DISPENSA_H * 3600.0)
         teto = TetoCarinho() if (regras.get("lar", False) if lar is None else lar) else None
+        ach = ach_dos_contextos(brain)
         j = {post: k for k, post in enumerate(brain.plastic_posts)}
         pressoes = np.linspace(PRESSAO_AO_DORMIR, ajustes.LIMIAR_ACORDA_PRESSAO, int(sonos) + 1)
         base = None
@@ -342,7 +419,7 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
             if dia == noites:
                 linhas[-1]["aprendido"] = brain.learned.tolist()
                 break
-            simular_dia(brain, memoria, rng, regras, perfil, habituacao, relogio, dia * DIA_S, teto)
+            simular_dia(brain, memoria, rng, regras, perfil, habituacao, relogio, dia * DIA_S, teto, ach)
             for de, ate in zip(pressoes[:-1], pressoes[1:]):
                 simular_noite(brain, sono, perfil, float(de), float(ate))
     return linhas
@@ -378,14 +455,18 @@ def main():
     parser.add_argument("--pulsos", action="store_true", help="simula os pulsos no replay, como o app (mais lento)")
     parser.add_argument("--cerebro", default="lif", choices=sorted(CEREBROS), help="lif (padrão) ou bio")
     parser.add_argument("--lar", action="store_true", help="liga a frente lar (o teto do carinho) em qualquer cenário")
+    parser.add_argument("--pl1", action="store_true", help="BioBrain com a plasticidade do PL-1 (implica --cerebro bio)")
     parser.add_argument("--json", help="grava as linhas neste arquivo")
     args = parser.parse_args()
+    if args.pl1:
+        args.cerebro = "bio"
 
     regras = CENARIOS[args.cenario]
     print(f"Cenário {args.cenario}: {regras['descricao']}. Perfil {regras['perfil']}, semente {args.semente}, "
           f"{args.noites} noites, {args.sonos} sono(s) por noite, cérebro {args.cerebro}"
-          f"{', lar ligado' if args.lar or regras.get('lar') else ''}.\n")
-    comum = {"pulsos": args.pulsos, "sonos": args.sonos, "cerebro": args.cerebro, "lar": True if args.lar else None}
+          f"{', lar ligado' if args.lar or regras.get('lar') else ''}{', PL-1 ligado' if args.pl1 else ''}.\n")
+    comum = {"pulsos": args.pulsos, "sonos": args.sonos, "cerebro": args.cerebro, "lar": True if args.lar else None,
+             "pl1": args.pl1}
     saida = {"com_shy": simular(args.cenario, args.noites, args.semente, **comum)}
     imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}, HABITUACAO_DISPENSA = {ajustes.HABITUACAO_DISPENSA}, "
              f"RECUPERACAO_DISPENSA_H = {ajustes.RECUPERACAO_DISPENSA_H}", saida["com_shy"])
