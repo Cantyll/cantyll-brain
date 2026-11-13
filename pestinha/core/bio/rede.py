@@ -29,6 +29,7 @@ from collections import deque
 
 import numpy as np
 
+from ... import ajustes
 from ...ajustes import AUSENCIA_CORRENTE
 from ...log import log
 from ...mathutil import valor_real
@@ -42,6 +43,18 @@ from .projecoes import compilar, projecao_de_bloco
 from .neuronios import TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, escala_de_corrente  # NE-1
 
 BIO_VERSION = 1
+
+
+def neuronios_das_chaves():
+    """
+    (tipos, ganho, tau_sinaptico) que as chaves da frente NE em ajustes.py pedem (NE-2 a NE-4). Com todas
+    desligadas, nenhuma população sai do LIF. Toda população que migra usa τ sináptico = τ_m do LIF (opção A).
+    """
+    tipos, ganho = {}, {}
+    if ajustes.NE_INIBIDORES_FS:                                # NE-2
+        tipos.update(QUIET="FS", INHIB="FS")
+        ganho.update(QUIET=ajustes.NE_GANHO_QUIET, INHIB=ajustes.NE_GANHO_INHIB)
+    return tipos, ganho, {name: "membrana" for name in tipos}
 
 
 class Pool(dict):
@@ -67,10 +80,13 @@ class BioBrain(Brain):
     def __init__(self, seed=None, temperament=None, seed_ruido=None, tipos=None, ganho=None, tau_sinaptico=None):
         """
         Mesmos argumentos do LIFBrain: seed (o indivíduo), temperament (ganhos) e seed_ruido (ruído reprodutível).
-        NE-1, para as populações que saem do LIF (padrão: nenhuma): tipos = {população: tipo de Izhikevich};
-        ganho = {população: fator} sobre a escala de corrente (padrão: 1); tau_sinaptico = {população: τ em ms}
-        para as correntes AMPA e GABA (padrão: os da spec, 5 e 10 ms; "membrana" usa o τ_m que ela tinha no LIF).
+        NE-1, para as populações que saem do LIF: tipos = {população: tipo de Izhikevich}; ganho = {população:
+        fator} sobre a escala de corrente (padrão: 1); tau_sinaptico = {população: τ em ms} para as correntes AMPA
+        e GABA (padrão: os da spec, 5 e 10 ms; "membrana" usa o τ_m que ela tinha no LIF). Sem nenhum dos três,
+        valem as chaves de ajustes.py (`neuronios_das_chaves`; todas desligadas: nenhuma população muda).
         """
+        if tipos is None and ganho is None and tau_sinaptico is None:
+            tipos, ganho, tau_sinaptico = neuronios_das_chaves()
         self.seed = self.SEED if seed is None else seed
         self.temperament = dict(temperament or {})
         self.tipos = dict(tipos or {})

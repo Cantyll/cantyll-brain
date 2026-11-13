@@ -128,6 +128,12 @@ LIMIAR_CANTO_HZ = 3.0           # CANTO acima disso: vai para o cantinho
 GANHO_TRAVESSURA = 0.002        # travessuras por segundo, por Hz do motor TRAVESSURA
 GANHO_CARTAZ = 0.5              # cartazes por segundo, por Hz do motor CARTAZ
 GANHO_PAPEL = 0.05              # bolinhas de papel por segundo, por Hz do motor PAPEL
+# Neurônios do BioBrain (frente NE; core/bio/neuronios.py). Só valem para o cérebro "bio". Toda população que
+# migra usa τ sináptico = τ_m que tinha no LIF (decisão do Cantyll, 2026-11-13, opção A); o ganho multiplica a
+# escala de partida (escala_de_corrente: a mesma entrada mínima de disparo do LIF).
+NE_INIBIDORES_FS = False        # NE-2: QUIET e INHIB em Izhikevich FS (R7: desligado por padrão)
+NE_GANHO_QUIET = 1.0            # medido (comparar_izhikevich.py --calibrar): com 1,0 a QUIET dá 2,3 Hz contra 2,4 do LIF
+NE_GANHO_INHIB = 1.2            # medido (idem): com 1,0 a INHIB dá 24 Hz contra 37 do LIF; com 1,2, 35
 # <<< decisões
 
 # ---------------------------------------------------------------------------
@@ -311,6 +317,8 @@ _LIMITES = {
     "GANHO_TRAVESSURA": (float, 0.0, 1.0),
     "GANHO_CARTAZ": (float, 0.0, 1.0),
     "GANHO_PAPEL": (float, 0.0, 1.0),
+    "NE_GANHO_QUIET": (float, 0.1, 10.0),
+    "NE_GANHO_INHIB": (float, 0.1, 10.0),
     # <<< decisões
     "LADO_JANELA_PET": (int, 100, 1000),
     "ZZZ_QUANTIDADE": (int, 0, 20),
