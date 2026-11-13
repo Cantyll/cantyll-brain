@@ -179,6 +179,11 @@ def app_com_lar(qapp, tmp_path, monkeypatch):
     app.tray.icon.hide()
 
 
+def _contagens(lar):
+    """O estado do lar sem a carga de carinho (que não é gravada como contagem)."""
+    return {k: v for k, v in lar.estado().items() if k != "carga_carinho_s"}
+
+
 def _lar(app):
     assert app.modulos.nomes() == ["lar"] and app.modulos.erros == []
     return app.modulos.modulos[0]
@@ -241,13 +246,13 @@ def test_conta_sonos_na_cama_e_fora_e_guarda(app_com_lar):
     app.sleep.fall_asleep()
     assert not lar.cama.ocupada
     app.sleep.wake(startled=False)
-    assert lar.estado() == {"sonos_na_cama": 1, "sonos_fora": 1, "travessuras_de_casa": 0}
+    assert _contagens(lar) == {"sonos_na_cama": 1, "sonos_fora": 1, "travessuras_de_casa": 0}
     app.save()
     pasta = app.pet_paths.modulo("lar")
     assert (pasta / ARQUIVO).exists()
     outro = LarModulo(app, cama=lar.cama)
     outro.carregar(pasta)
-    assert outro.estado() == {"sonos_na_cama": 1, "sonos_fora": 1, "travessuras_de_casa": 0}
+    assert _contagens(outro) == {"sonos_na_cama": 1, "sonos_fora": 1, "travessuras_de_casa": 0}
 
 
 @pytest.mark.parametrize("conteudo", ['{"sonos_na_cama": -1, "sonos_fora": true, "travessuras_de_casa": 1.5}',
@@ -260,4 +265,4 @@ def test_arquivo_ruim_comeca_do_zero(app_com_lar, conteudo):
     (pasta / ARQUIVO).write_text(conteudo, encoding="utf-8")
     outro = LarModulo(app, cama=_lar(app).cama)
     outro.carregar(pasta)
-    assert outro.estado() == {"sonos_na_cama": 0, "sonos_fora": 0, "travessuras_de_casa": 0}
+    assert _contagens(outro) == {"sonos_na_cama": 0, "sonos_fora": 0, "travessuras_de_casa": 0}

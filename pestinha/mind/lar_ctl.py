@@ -17,13 +17,18 @@ A parte de necessidades da opção A (lazer no lar, decidida pelo Cantyll em 202
     - a travessura que vem do tédio, em paz, vira travessura de casa (mind/mischief_ctl.py chama
       `travessura`): ele vai até a cama, pula nela por LAR_DURACAO_BAGUNCA e a deixa bagunçada
       até ir dormir. Tira o tédio como a travessura da tela, sem nada na sua tela;
-    - dispensar uma travessura ou arrancar um cartaz deixa de contar como atenção (carência).
+    - dispensar uma travessura ou arrancar um cartaz deixa de contar como atenção (carência);
+    - teto do carinho (encaixe ajustar_recompensa): o carinho continua alegrando e acalmando
+      inteiro, mas o quanto ele ensina cai com o carinho recente. Cada segundo de carinho soma 1 a
+      uma carga que vaza (τ = LAR_RECUPERACAO_CARINHO_H); o reforço vale 0,5 ** (carga / meia-vida).
+      Como a habituação à dispensa, a carga vive só na memória do processo: reabrir o app zera.
 
 Não toca a rede: nenhum canal novo, nenhuma recompensa (o reforço do lar espera o PL-1, regra R2).
 Na pausa e no pânico o app não chama o módulo; o pedido de ir para a cama vence em
 LAR_VALIDADE_CAMA e ele volta ao passeio normal se o módulo sair do registro por defeito.
 """
 
+import math
 import time
 
 from PySide6.QtCore import QEvent, QObject
@@ -80,6 +85,9 @@ class LarModulo(Modulo):
         self.cama.setVisible(app.pet.isVisible())
         self.sonos = {"na_cama": 0, "fora": 0}
         self.baguncas = 0               # travessuras de casa desde sempre
+        self.carga_carinho = 0.0        # segundos de carinho recente (vaza com o tempo)
+        self.carga_em = None            # quando a carga foi atualizada (relógio monotônico)
+        self.relogio = time.monotonic
         self.bagunca_ate = 0.0          # até quando dura a travessura de casa em andamento (relógio monotônico)
         app.mischief_ctl.travessura_de_casa = self.travessura
         for controlador in (app.mischief_ctl, app.protest_ctl, app.sad_ctl):
@@ -113,6 +121,29 @@ class LarModulo(Modulo):
             app.behavior.cama = None
         self.cama.set_ocupada(sono.asleep and deitado(app.pet.body, x_cama))
 
+    def _carga_agora(self):
+        """A carga de carinho neste instante, já com o vazamento desde a última atualização."""
+        agora = self.relogio()
+        if self.carga_em is not None:
+            passou = max(0.0, agora - self.carga_em)
+            self.carga_carinho *= math.exp(-passou / (ajustes.LAR_RECUPERACAO_CARINHO_H * 3600.0))
+        self.carga_em = agora
+        return self.carga_carinho
+
+    def peso_carinho(self):
+        """Quanto o carinho de agora ensina (1 = inteiro)."""
+        meia = ajustes.LAR_MEIA_VIDA_CARINHO_S
+        return 1.0 if meia <= 0 else 0.5 ** (self._carga_agora() / meia)
+
+    def ajustar_recompensa(self, recompensa, fontes, dt):
+        """Teto do carinho: tira da recompensa a parte do carinho que já não ensina. Sem carinho, não mexe."""
+        carinho = fontes.get("carinho", 0.0)
+        if carinho <= 0.0 or ajustes.LAR_MEIA_VIDA_CARINHO_S <= 0:
+            return None
+        peso = self.peso_carinho()
+        self.carga_carinho += max(0.0, dt)
+        return recompensa - carinho * (1.0 - peso)
+
     def ao_dormir(self, cerebro):
         """Conta onde o sono começou."""
         na_cama = deitado(self.app.pet.body, self.cama.centro_x())
@@ -133,7 +164,7 @@ class LarModulo(Modulo):
     def estado(self):
         """Quantos sonos começaram na cama e fora dela, e quantas travessuras de casa."""
         return {"sonos_na_cama": self.sonos["na_cama"], "sonos_fora": self.sonos["fora"],
-                "travessuras_de_casa": self.baguncas}
+                "travessuras_de_casa": self.baguncas, "carga_carinho_s": round(self._carga_agora(), 1)}
 
     def salvar(self, pasta):
         """Grava as contagens em modulos/lar/lar.json."""
