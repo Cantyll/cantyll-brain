@@ -155,6 +155,7 @@ LIMIAR_ACORDA_PRESSAO_DIA = 0.5
 # Ausência (R1): modulador da rede, não sensor (core/nervous_system.py, definir_ausencia)
 # ---------------------------------------------------------------------------
 AUSENCIA_CORRENTE = 0.2         # corrente inibitória por ms em FUGIR e TRAVESSURA quando você está ausente (limiar de disparo: 1,0)
+NEGLIGENCIA_S = 600.0           # s: você presente e sem interagir com o pet por esse tempo liga a mesma guarda (decisão do Cantyll, 2026-11-13: 10 minutos; core/negligencia.py)
 
 # ---------------------------------------------------------------------------
 # Replay noturno (M3): reaplica os episódios durante o sono (spec, seção 9.4)
@@ -280,6 +281,7 @@ _LIMITES = {
     "PEDIDO_VALIDADE_S": (float, 1.0, 600.0),
     "JANELA_PEDIDOS_S": (float, 60.0, 86400.0),
     "FELIZ_APOS_CARINHO": (float, 0.0, 30.0),
+    "NEGLIGENCIA_S": (float, 1.0, 86400.0),
     # >>> decisões
     "LIMIAR_SENTAR_HZ": (float, 0.0, 200.0),
     "LIMIAR_LEVANTAR_HZ": (float, 0.0, 200.0),

@@ -3,7 +3,7 @@ A simulação de noites (B2 do plano; spec, seção 9.4). A simulação de 30 no
 de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase.
 
 Os testes de aceitação usam réguas relativas: a comparação com a mesma simulação sem SHY e com o dia 0
-da própria simulação. Os números absolutos da seção 10 da spec são decisão pendente.
+da própria simulação. O GLOOM absoluto no dia 30 é o critério da seção 10 da spec (decidido pelo Cantyll em 2026-11-13).
 
 Rodar: python -m pytest tests/test_simulacao_noites.py -q
 Só os rápidos: python -m pytest tests/test_simulacao_noites.py -q -k "not trinta_noites"
@@ -116,3 +116,19 @@ def test_trinta_noites_tristeza_fica_abaixo_do_limite_e_o_shy_e_o_que_segura(tri
     """A maior sinapse aprendida da GLOOM não chega ao limite LEARN_MAX. O controle, sem SHY, termina acima."""
     assert max(linha["peso_gloom_max"] for linha in trinta_noites) < 1.0
     assert trinta_noites[-1]["peso_gloom_max"] < trinta_noites_sem_shy[-1]["peso_gloom_max"]
+
+
+# GLOOM no dia 30, por cenário (spec, seção 10; decisão do Cantyll, 2026-11-13, opção A).
+LIMITE_GLOOM_DIA_30_HZ = {"duro": 2.0, "misto": 0.5, "carinhoso": 0.5}
+
+
+def test_trinta_noites_gloom_no_cenario_duro_dentro_do_criterio(trinta_noites):
+    assert trinta_noites[-1]["dia"] == 30
+    assert trinta_noites[-1]["uso_hz"]["GLOOM"] <= LIMITE_GLOOM_DIA_30_HZ["duro"]
+
+
+@pytest.mark.parametrize("cenario", ["misto", "carinhoso"])
+def test_trinta_noites_gloom_nos_cenarios_com_carinho_dentro_do_criterio(cenario):
+    ultimo = simular_noites.simular(cenario, noites=30, semente=7, dias=())[-1]
+    assert ultimo["dia"] == 30
+    assert ultimo["uso_hz"]["GLOOM"] <= LIMITE_GLOOM_DIA_30_HZ[cenario]
