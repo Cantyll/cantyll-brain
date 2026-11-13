@@ -4,13 +4,17 @@ on: [push, pull_request]
 jobs:
   testes:
     # Windows, macOS e Linux. Repositórios públicos têm minutos grátis nos três.
+    # Cada sistema roda a suíte com os dois cérebros (plano, portão A): lif, o padrão, e bio (core/bio/).
+    name: testes (${{ matrix.os }}, ${{ matrix.cerebro }})
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
+        cerebro: [lif, bio]
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
+      PESTINHA_CEREBRO: ${{ matrix.cerebro }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

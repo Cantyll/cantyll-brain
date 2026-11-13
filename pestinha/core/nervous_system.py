@@ -866,9 +866,12 @@ class LIFBrain(Brain):
             return False
 
 def criar_cerebro(tipo="lif", seed=None, temperament=None):
-    """Escolhe o backend pelo nome (config.CEREBRO). Nesta fase só existe 'lif'; outro nome levanta ValueError."""
+    """Escolhe o backend pelo nome (config.CEREBRO): 'lif' ou 'bio'. Outro nome levanta ValueError."""
     if tipo == "lif":
         return LIFBrain(seed=seed, temperament=temperament)
+    if tipo == "bio":
+        from .bio import BioBrain          # aqui dentro: core/bio importa este módulo
+        return BioBrain(seed=seed, temperament=temperament)
     raise ValueError(f"cérebro desconhecido: {tipo!r}")
 
 
