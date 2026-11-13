@@ -227,7 +227,8 @@ LAR_RECOMPENSA_TEDIO = 3.0      # reforço do lar (PL-1): recompensa total por t
 # BioBrain aprende como o LIF (recompensa bruta). Ligada: δ = r − V, com V de um crítico (core/conditioning.py,
 # decisão D3), e a taxa multiplicada por (0,5 + ACh). Só vale para o cérebro "bio". Números escolhidos, não medidos,
 # a não ser onde o comentário diz.
-PL_DELTA = False                # liga a regra δ = r − V no BioBrain (R7: desligada por padrão)
+PL_DELTA = True                 # δ = r − V no BioBrain. Ligada por padrão desde 2026-11-13 (decisão do Cantyll); o app
+                                # segue no LIF (config.CEREBRO), então só vale quando o cérebro for o bio
 PL_CRITICO_TAXA = 0.5           # por passo de 0,1 s: quão rápido o crítico aprende a prever (calibrado: 20 pares pista e
                                 # recompensa levam δ a ~0%; com 0,3 o PEDIDO ainda subia 10% em mais 20 pares)
 PL_CRITICO_TAU_S = 30.0         # τ_V: até quantos segundos depois de uma pista a recompensa ainda conta como dela

@@ -128,7 +128,7 @@ def test_interface_igual_a_do_lif():
     assert set(bio.motor_activity()) == set(lif.motor_activity())
     assert set(bio.efficacy()) == set(lif.efficacy())
     estado_bio, estado_lif = bio.estado(), lif.estado()
-    assert set(estado_bio) == set(estado_lif)
+    assert set(estado_bio) - {"plasticidade"} == set(estado_lif)   # o crítico do PL-1 é só do bio
     assert estado_bio["tipo"] == "bio" and estado_bio["versao"] == BIO_VERSION
     assert estado_bio["aprendido"] == estado_lif["aprendido"]
     assert bio.learned_summary() == []

@@ -38,9 +38,10 @@ O que é suposição, e não medida de uso real:
   episódio, e a carência não entra na rede pelo aprendizado, então nenhuma das duas muda as sinapses.
   O cenário "so_o_lar" é o lar ligado com você presente e sem interagir: sem dispensa, sem carinho e
   sem travessura na tela (a do tédio vai para o canto dele).
-- O PL-1 (--pl1): o BioBrain com δ = r − V e a ACh na taxa. O crítico lê só as pistas (PEDIDO, ANTICIPATE e
-  outras; ajustes.PL_CANAIS_CRITICO), e nenhum contexto daqui tem pista, então V fica em zero e δ = r·dt, a
-  mesma conta de antes. A ACh só entra com ajustes.PL_ACH (desligada por padrão: com ela a regra 8 falha no
+- O PL-1: o BioBrain com δ = r − V. Com --cerebro bio ele segue ajustes.PL_DELTA (ligado por padrão); --pl1 liga e
+  implica o bio; --sem-pl1 desliga. O crítico lê só as pistas (PEDIDO, ANTICIPATE e outras;
+  ajustes.PL_CANAIS_CRITICO), e nenhum contexto daqui tem pista, então V fica em zero e δ = r·dt, a mesma conta
+  de antes. A ACh só entra com ajustes.PL_ACH (desligada por padrão: com ela a regra 8 falha no
   misto e no carinhoso). Ligada, é o que muda: cada contexto tem a dele, tirada da taxa do FOCUS num gêmeo da
   rede no dia 0 (ach_dos_contextos), porque o dia comprimido não roda os pulsos, e a média lenta é a média
   dos contextos pelo peso de cada um no dia. No replay a ACh não entra.
@@ -370,23 +371,24 @@ def medir(brain):
 
 
 def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, sonos=1, cerebro="lif",
-            lar=None, pl1=False, **trocas):
+            lar=None, pl1=None, **trocas):
     """
     Roda `noites` dias e noites. dias: em quais manhãs medir (padrão DIAS_PADRAO; o dia 0 e o último entram sempre).
     pulsos: True simula os pulsos no replay, como o app (mais lento, mesmas sinapses no LIFBrain).
     sonos: em quantos sonos cada noite é picada (1: a noite inteira de uma vez).
     cerebro: "lif" (LIFBrain) ou "bio" (BioBrain).
     lar: True liga a frente lar (o teto do carinho). None: o que o cenário disser (só "so_o_lar" liga).
-    pl1: True liga a plasticidade do PL-1 (ajustes.PL_DELTA) no BioBrain; exige cerebro="bio".
+    pl1: True liga a plasticidade do PL-1 (ajustes.PL_DELTA) no BioBrain (exige cerebro="bio"); False desliga;
+         None segue ajustes.PL_DELTA.
     trocas: valores de ajustes.py só para esta simulação (por exemplo HOMEOSTASE_SHY=0.0, para comparar).
     Devolve uma lista de linhas (dict), uma por manhã medida. A última traz também "aprendido".
     """
     regras = CENARIOS[cenario] if isinstance(cenario, str) else cenario
     perfil = config.PROFILES[regras["perfil"]]
-    if pl1:
-        if cerebro != "bio":
-            raise ValueError("o PL-1 só existe no BioBrain: use cerebro='bio'")
-        trocas = dict(trocas, PL_DELTA=True)
+    if pl1 and cerebro != "bio":
+        raise ValueError("o PL-1 só existe no BioBrain: use cerebro='bio'")
+    if pl1 is not None:
+        trocas = dict(trocas, PL_DELTA=bool(pl1))
     dias = set(DIAS_PADRAO if dias is None else dias) | {0, noites}
     linhas = []
     with contextlib.ExitStack() as pilha:
@@ -461,17 +463,22 @@ def main():
     parser.add_argument("--cerebro", default="lif", choices=sorted(CEREBROS), help="lif (padrão) ou bio")
     parser.add_argument("--lar", action="store_true", help="liga a frente lar (o teto do carinho) em qualquer cenário")
     parser.add_argument("--pl1", action="store_true", help="BioBrain com a plasticidade do PL-1 (implica --cerebro bio)")
+    parser.add_argument("--sem-pl1", action="store_true", help="BioBrain sem o PL-1 (a regra do LIF), para comparar")
     parser.add_argument("--json", help="grava as linhas neste arquivo")
     args = parser.parse_args()
+    if args.pl1 and args.sem_pl1:
+        parser.error("--pl1 e --sem-pl1 juntos")
     if args.pl1:
         args.cerebro = "bio"
+    pl1 = True if args.pl1 else (False if args.sem_pl1 else None)
+    pl1_ligado = args.cerebro == "bio" and (ajustes.PL_DELTA if pl1 is None else pl1)
 
     regras = CENARIOS[args.cenario]
     print(f"Cenário {args.cenario}: {regras['descricao']}. Perfil {regras['perfil']}, semente {args.semente}, "
           f"{args.noites} noites, {args.sonos} sono(s) por noite, cérebro {args.cerebro}"
-          f"{', lar ligado' if args.lar or regras.get('lar') else ''}{', PL-1 ligado' if args.pl1 else ''}.\n")
+          f"{', lar ligado' if args.lar or regras.get('lar') else ''}{', PL-1 ligado' if pl1_ligado else ''}.\n")
     comum = {"pulsos": args.pulsos, "sonos": args.sonos, "cerebro": args.cerebro, "lar": True if args.lar else None,
-             "pl1": args.pl1}
+             "pl1": pl1}
     saida = {"com_shy": simular(args.cenario, args.noites, args.semente, **comum)}
     imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}, HABITUACAO_DISPENSA = {ajustes.HABITUACAO_DISPENSA}, "
              f"RECUPERACAO_DISPENSA_H = {ajustes.RECUPERACAO_DISPENSA_H}", saida["com_shy"])
