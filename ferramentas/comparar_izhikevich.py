@@ -8,6 +8,9 @@ NE-1 (plano, onda 2): custo e atividade do BioBrain com populações em Izhikevi
     python ferramentas/comparar_izhikevich.py --portao ne2    # portão A (20 sementes) com a chave da NE-2 ligada
     python ferramentas/comparar_izhikevich.py --ajustar ne3   # ganhos da NE-3 por bisseção contra o LIF
     python ferramentas/comparar_izhikevich.py --portao ne3    # portão A com as chaves da NE-2 e da NE-3 ligadas
+    python ferramentas/comparar_izhikevich.py --ajustar ne4   # ganhos dos motores (menos o STARTLE)
+    python ferramentas/comparar_izhikevich.py --comportamento ne4   # reflexo de susto e MotorDecoder contra o LIF
+    python ferramentas/comparar_izhikevich.py --portao ne4    # portão A com a NE-2, a NE-3 e a NE-4 ligadas
 
 Configurações (nenhuma é o padrão do app: o padrão do BioBrain segue sem população em Izhikevich):
 
@@ -54,7 +57,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pestinha import ajustes  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
 from pestinha.core.bio import BioBrain, acelerado  # noqa: E402
-from pestinha.core.bio.rede import EXCITATORIOS_NE3, gasto_das_chaves, neuronios_das_chaves  # noqa: E402
+from pestinha.core.bio.rede import EXCITATORIOS_NE3, MOTORES_NE4, gasto_das_chaves, neuronios_das_chaves  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import simular_noites  # noqa: E402
@@ -87,6 +90,7 @@ CONFIGS = {
 CHAVES = {
     "ne2": ("NE_INIBIDORES_FS",),
     "ne3": ("NE_INIBIDORES_FS", "NE_EXCITATORIOS"),
+    "ne4": ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES"),
 }
 
 
@@ -106,6 +110,7 @@ def _com_chaves(frente):
 
 CONFIGS["chaves_ne2"] = _com_chaves("ne2")
 CONFIGS["chaves_ne3"] = _com_chaves("ne3")
+CONFIGS["chaves_ne4"] = _com_chaves("ne4")
 
 
 def cerebro(config, seed_ruido=42, numba=None):
@@ -160,19 +165,26 @@ def calibrar(frente, sementes=(3, 7, 11, 13, 17)):
         print()
 
 
-AJUSTAR = {"ne3": EXCITATORIOS_NE3}
 # Os contextos da simulação de noites, mais a dispensa, o carinho e o susto (onde a ALERT dispara).
 CONTEXTOS_AJUSTE = [(nome, sentidos) for nome, sentidos, _ in simular_noites.CONTEXTOS] + [
     ("DISPENSA", {"DISMISS": 1.0, "BOREDOM": 0.5}),
     ("CARINHO", {"CARESS": 1.0}),
     ("SUSTO", {"MOTION": 1.0, "IMPACT": 0.5}),
 ]
+# NE-4: os de cima, mais cada canal que move algum motor no LIF, em 1,0 e em 0,5 (perto dos limiares de decisão).
+CANAIS_DOS_MOTORES = ("MOTION", "NOVELTY", "SILENCE", "WORK", "PLAY", "SOUND", "FATIGUE", "POKE", "DRAG", "DISMISS",
+                      "LONELY", "CARESS", "ANTICIPATE", "TOY_NEAR", "TOY_TAKEN", "THROW", "IMPACT", "BOREDOM", "PEDIDO",
+                      "PRESO", "LEMBRA_FUGA", "RECUSA", "ANTECIPA_PLACA", "VISITA", "RECEIO", "RANCOR")
+CONTEXTOS_NE4 = CONTEXTOS_AJUSTE + [(f"{c} {n:.1f}", {c: n}) for c in CANAIS_DOS_MOTORES for n in (1.0, 0.5)]
+# O STARTLE fica fora da bisseção da NE-4: o ganho dele sai do reflexo de susto (--comportamento ne4).
+AJUSTAR = {"ne3": (EXCITATORIOS_NE3, CONTEXTOS_AJUSTE),
+           "ne4": (tuple(m for m in MOTORES_NE4 if m != "STARTLE"), CONTEXTOS_NE4)}
 
 
-def _taxas_por_contexto(nomes, sementes, **kwargs):
+def _taxas_por_contexto(nomes, sementes, contextos=CONTEXTOS_AJUSTE, **kwargs):
     """Hz de cada população em cada contexto (0,3 s de aquecimento, 1,5 s medidos), média das sementes."""
-    taxas = np.zeros((len(CONTEXTOS_AJUSTE), len(nomes)))
-    for i, (_nome, sentidos) in enumerate(CONTEXTOS_AJUSTE):
+    taxas = np.zeros((len(contextos), len(nomes)))
+    for i, (_nome, sentidos) in enumerate(contextos):
         for semente in sementes:
             b = BioBrain(seed=semente, seed_ruido=simular_noites.MEDIDA_SEMENTE, **kwargs)
             b.stimulate(sentidos)
@@ -188,18 +200,19 @@ def _taxas_por_contexto(nomes, sementes, **kwargs):
 
 def ajustar(frente, sementes=(3, 7, 11), rodadas=10):
     """
-    Ganho de cada população da frente por bisseção (em escala log, entre 0,05 e 2): a taxa somada nos contextos
-    de CONTEXTOS_AJUSTE fica igual à do LIF. Todas as populações andam juntas a cada rodada, porque uma muda a
-    entrada da outra. Imprime as linhas para ajustes.py e a tabela final por contexto.
+    Ganho de cada população da frente por bisseção (em escala log, entre 0,05 e 4): a taxa somada nos contextos
+    da frente fica igual à do LIF. Todas as populações andam juntas a cada rodada, porque uma muda a entrada da
+    outra. Imprime as linhas para ajustes.py e a tabela final por contexto.
     """
-    nomes = list(AJUSTAR[frente])
+    nomes, contextos = AJUSTAR[frente]
+    nomes = list(nomes)
     base = _com_chaves(frente)
-    lif = _taxas_por_contexto(nomes, sementes, tipos={})
+    lif = _taxas_por_contexto(nomes, sementes, contextos, tipos={})
     baixo = {n: 0.05 for n in nomes}
-    alto = {n: 2.0 for n in nomes}
+    alto = {n: 4.0 for n in nomes}
     ganho = {n: math.sqrt(baixo[n] * alto[n]) for n in nomes}
     for rodada in range(rodadas):
-        izh = _taxas_por_contexto(nomes, sementes, tipos=base["tipos"], tau_sinaptico=base["tau_sinaptico"],
+        izh = _taxas_por_contexto(nomes, sementes, contextos, tipos=base["tipos"], tau_sinaptico=base["tau_sinaptico"],
                                   gasta_corrente=base["gasta_corrente"], ganho={**base["ganho"], **ganho})
         razoes = []
         for j, n in enumerate(nomes):
@@ -216,11 +229,96 @@ def ajustar(frente, sementes=(3, 7, 11), rodadas=10):
     print("\nPara ajustes.py:\n")
     for n in nomes:
         print(f"NE_GANHO_{n} = {ganho[n]:.3f}")
-    print(f"\nHz por contexto, LIF / Izhikevich (o ganho da última linha de cada população é o da rodada {rodadas})\n")
-    print("| população | " + " | ".join(nome for nome, _ in CONTEXTOS_AJUSTE) + " |")
-    print("|---|" + "---|" * len(CONTEXTOS_AJUSTE))
-    for j, n in enumerate(nomes):
-        print(f"| {n} | " + " | ".join(f"{lif[i, j]:.1f} / {izh[i, j]:.1f}" for i in range(len(CONTEXTOS_AJUSTE))) + " |")
+    print(f"\nHz por contexto, LIF / Izhikevich (medido com os ganhos da rodada {rodadas})\n")
+    print("| contexto | " + " | ".join(nomes) + " |")
+    print("|---|" + "---|" * len(nomes))
+    for i, (nome, _) in enumerate(contextos):
+        print(f"| {nome} | " + " | ".join(f"{lif[i, j]:.1f} / {izh[i, j]:.1f}" for j in range(len(nomes))) + " |")
+
+
+# Reflexo de susto: estímulo de 300 ms (o susto real é curto) ou de 3 s (entrada fraca e contínua, onde o susto
+# não deveria disparar mais que no LIF). Lido como o app lê: pool_rate a cada 33 ms, susto quando passa de
+# Emotion.STARTLE_HZ, rearma abaixo de 30% dele.
+CASOS_SUSTO = [
+    ("SUSTO 300 ms", {"MOTION": 1.0, "IMPACT": 0.5}, 300), ("MOTION 1.0, 300 ms", {"MOTION": 1.0}, 300),
+    ("IMPACT 1.0, 300 ms", {"IMPACT": 1.0}, 300), ("ANTECIPA_PLACA 1.0, 300 ms", {"ANTECIPA_PLACA": 1.0}, 300),
+    ("ANTICIPATE 1.0, 300 ms", {"ANTICIPATE": 1.0}, 300), ("IMPACT 0.5, 300 ms", {"IMPACT": 0.5}, 300),
+    ("MOTION 0.5, 3 s", {"MOTION": 0.5}, 3000), ("ANTICIPATE 0.5, 3 s", {"ANTICIPATE": 0.5}, 3000),
+    ("POKE 1.0, 3 s", {"POKE": 1.0}, 3000), ("DRAG 1.0, 3 s", {"DRAG": 1.0}, 3000),
+    ("IDLE, 3 s", {"SILENCE": 0.3, "BOREDOM": 1.0}, 3000),
+]
+
+
+def sustos(sentidos, dur_ms, sementes=range(1, 21), **kwargs):
+    """(sementes com susto, pico médio do STARTLE em Hz) para um estímulo de dur_ms, lido a cada 33 ms por 3 s."""
+    from pestinha.core.emotion import STARTLE_HZ
+    n, picos = 0, []
+    for semente in sementes:
+        b = BioBrain(seed=semente, seed_ruido=semente + 100, **kwargs)
+        b.stimulate({"SILENCE": 0.2})
+        for _ in range(30):
+            b.step(33)
+        b.stimulate(sentidos)
+        i, armado, pico = b._pool_index["STARTLE"], True, 0.0
+        for k in range(3000 // 33):
+            if k * 33 >= dur_ms:
+                b.stimulate({"SILENCE": 0.2})
+            b.step(33)
+            r = b.pool_rate[i]
+            pico = max(pico, r)
+            if r >= STARTLE_HZ and armado:
+                n, armado = n + 1, False
+            elif r < 0.3 * STARTLE_HZ:
+                armado = True
+        picos.append(pico)
+    return n, float(np.mean(picos))
+
+
+def perfil_de_comportamento(sentidos, sementes=range(1, 11), dur_s=6.0, **kwargs):
+    """Fração do tempo em cada comportamento do MotorDecoder (lido a cada 33 ms), média das sementes."""
+    from collections import Counter
+    conta = Counter()
+    for semente in sementes:
+        b = BioBrain(seed=semente, seed_ruido=semente + 200, **kwargs)
+        d, t = ns.MotorDecoder(), 0.0
+        b.stimulate(sentidos)
+        for _ in range(int(dur_s / 0.033)):
+            b.step(33)
+            t += 0.033
+            atual, _ = d.update(b.motor_activity(), now=t)
+            conta[atual or "-"] += 1
+    total = sum(conta.values())
+    return {k: v / total for k, v in conta.items()}
+
+
+def comportamento(frente):
+    """
+    O que a frente muda no que o app faz com os motores: o reflexo de susto (20 sementes) e o comportamento do
+    MotorDecoder em cada contexto da NE-4 com os canais em 1,0 (10 sementes, 6 s). A distância é a da variação
+    total entre as frações de tempo (0 = igual ao LIF, 1 = nada em comum).
+    """
+    lif = {"tipos": {}}
+    frente_ = _com_chaves(frente)
+    print(f"Reflexo de susto, LIF / {frente} (sementes com susto em 20; pico médio do STARTLE em Hz)\n")
+    print("| estímulo | sustos | pico Hz |")
+    print("|---|---|---|")
+    for nome, sentidos, dur in CASOS_SUSTO:
+        (nl, pl), (nz, pz) = sustos(sentidos, dur, **lif), sustos(sentidos, dur, **frente_)
+        print(f"| {nome} | {nl} / {nz} | {pl:.1f} / {pz:.1f} |", flush=True)
+    print(f"\nComportamento do MotorDecoder, LIF / {frente} (fração do tempo; os três mais frequentes)\n")
+    print("| contexto | LIF | " + frente + " | distância |")
+    print("|---|---|---|---|")
+    soma = 0.0
+    contextos = [(n, s) for n, s in CONTEXTOS_NE4 if not n.endswith(" 0.5")]
+    for nome, sentidos in contextos:
+        a, b = perfil_de_comportamento(sentidos, **lif), perfil_de_comportamento(sentidos, **frente_)
+        dist = 0.5 * sum(abs(a.get(k, 0.0) - b.get(k, 0.0)) for k in set(a) | set(b))
+        soma += dist
+
+        def top(p):
+            return ", ".join(f"{k} {v:.2f}" for k, v in sorted(p.items(), key=lambda x: -x[1])[:3])
+        print(f"| {nome} | {top(a)} | {top(b)} | {dist:.2f} |", flush=True)
+    print(f"\nDistância média: {soma / len(contextos):.3f} em {len(contextos)} contextos")
 
 
 def portao(frente, extra=()):
@@ -288,6 +386,7 @@ def main(argv=None):
     parser.add_argument("--calibrar", choices=sorted(CALIBRAR), help="só a calibração da frente")
     parser.add_argument("--portao", choices=sorted(CHAVES), help="só o portão A com as chaves da frente ligadas")
     parser.add_argument("--ajustar", choices=sorted(AJUSTAR), help="só o ajuste dos ganhos da frente, por bisseção")
+    parser.add_argument("--comportamento", choices=("ne3", "ne4"), help="só o reflexo de susto e o MotorDecoder, contra o LIF")
     args, extra = parser.parse_known_args(argv)
     if args.portao:
         return portao(args.portao, extra)
@@ -297,6 +396,8 @@ def main(argv=None):
         return calibrar(args.calibrar)
     if args.ajustar:
         return ajustar(args.ajustar)
+    if args.comportamento:
+        return comportamento(args.comportamento)
     configs = args.config or list(CONFIGS)
 
     if args.so != "atividade":
