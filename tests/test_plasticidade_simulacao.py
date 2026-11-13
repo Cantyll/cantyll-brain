@@ -23,7 +23,7 @@ def _dia(linhas, dia):
 
 def test_so_o_lar_sem_pl1_nao_aprende():
     """O controle do PR #27: sem o PL-1, as bagunças não têm recompensa e nada é aprendido."""
-    linhas = simular_noites.simular("so_o_lar", 3, 7, dias=(0, 3), cerebro="bio")
+    linhas = simular_noites.simular("so_o_lar", 3, 7, dias=(0, 3), cerebro="bio", pl1=False)
     assert not any(any(v != 0.0 for v in fila) for fila in _dia(linhas, 3)["aprendido"])
 
 
@@ -40,9 +40,10 @@ def test_pl1_so_existe_no_bio():
         simular_noites.simular("duro", 1, 7, dias=(0, 1), cerebro="lif", pl1=True)
 
 
-def test_pl1_nao_fica_ligado_depois_da_simulacao():
-    simular_noites.simular("so_o_lar", 1, 7, dias=(0, 1), cerebro="bio", pl1=True)
-    assert ajustes.PL_DELTA is False
+def test_a_simulacao_devolve_a_chave_como_estava():
+    antes = ajustes.PL_DELTA
+    simular_noites.simular("so_o_lar", 1, 7, dias=(0, 1), cerebro="bio", pl1=not antes)
+    assert ajustes.PL_DELTA is antes
 
 
 def test_criterio_da_gloom_no_duro_com_pl1():

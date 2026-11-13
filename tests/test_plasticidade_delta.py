@@ -67,9 +67,15 @@ def _peso(brain, canal, post="PLAYFUL"):
 
 # ---------------- desligado: igual ao LIF ----------------
 
-def test_desligado_por_padrao_e_aprende_como_antes():
-    """R7: sem a chave, nada muda. A mesma sequência dá o mesmo aprendizado de antes (recompensa bruta)."""
-    assert ajustes.PL_DELTA is False
+def test_ligado_por_padrao_no_bio():
+    """Decisão do Cantyll (2026-11-13, card A): o PL-1 vem ligado no BioBrain."""
+    assert ajustes.PL_DELTA is True
+    assert _cerebro().plasticidade is not None
+
+
+def test_desligado_aprende_como_antes(monkeypatch):
+    """Sem a chave, nada muda. A mesma sequência dá o mesmo aprendizado de antes (recompensa bruta)."""
+    monkeypatch.setattr(ajustes, "PL_DELTA", False)
     brain = _cerebro()
     assert brain.plasticidade is None
     for _ in range(5):

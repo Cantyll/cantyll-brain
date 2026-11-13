@@ -1,8 +1,8 @@
 """
 Plasticidade do BioBrain com erro de predição (PL-1, parte 1; spec, seções 7.2 e 7.4; decisão D3). Dono: PL-1.
 
-Desligada (ajustes.PL_DELTA = False), o BioBrain aprende como o LIF: δ = r − expected com expected = 0 no app,
-ou seja, recompensa bruta. Ligada, δ é o erro de diferença temporal do crítico (core/conditioning.py, decisão
+Ligada por padrão (ajustes.PL_DELTA; o app segue no LIF até config.CEREBRO mudar). Desligada, o BioBrain aprende
+como o LIF: δ = r − expected com expected = 0 no app, ou seja, recompensa bruta. Ligada, δ é o erro de diferença temporal do crítico (core/conditioning.py, decisão
 D3): δ = r·dt + γ·V(agora) − V(antes). Com ajustes.PL_ACH (desligada por padrão), a taxa acordado também segue a
 acetilcolina (core/bio/moduladores.py).
 O que muda no pet:

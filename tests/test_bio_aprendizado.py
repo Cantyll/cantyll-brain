@@ -16,6 +16,13 @@ from ferramentas.simular_noites import simular
 from pestinha.core import nervous_system as ns
 from pestinha.core.bio import BioBrain
 from pestinha.core.nervous_system import LIFBrain
+from pestinha import ajustes
+
+
+@pytest.fixture(autouse=True)
+def _regra_do_lif(monkeypatch):
+    """A paridade é com a regra do LIF: o PL-1 (ligado por padrão no bio) muda o aprendizado de propósito."""
+    monkeypatch.setattr(ajustes, "PL_DELTA", False)
 
 SEQUENCIA = [
     ({"CARESS": 1.0, "POKE": 0.4}, 1.0),

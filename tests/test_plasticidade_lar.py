@@ -32,9 +32,9 @@ def _montar(qapp, tmp_path, monkeypatch, pl1):
     from pestinha.settings_store import SettingsStore
     monkeypatch.setattr(config, "FRENTES", dict(config.FRENTES, lar=True))
     monkeypatch.setattr("pestinha.app.senses.is_fullscreen", lambda: False)
+    monkeypatch.setattr(ajustes, "PL_DELTA", pl1)
     if pl1:
         monkeypatch.setattr(config, "CEREBRO", "bio")
-        monkeypatch.setattr(ajustes, "PL_DELTA", True)
     paths = Paths(root=tmp_path)
     store = SettingsStore(paths)
     store.update(dict(config.DEFAULT_PERMISSIONS, rotina=False))
