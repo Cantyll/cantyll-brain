@@ -185,6 +185,8 @@ LAR_CHEGOU_CAMA = 14            # px do centro da cama: já está deitado nela
 LAR_VALIDADE_CAMA = 1.0         # s: o pedido de ir para a cama vale isso; sem o módulo renovar, ele esquece
 LAR_DURACAO_BAGUNCA = 8.0       # s: uma travessura de casa (pular na cama e bagunçar o canto)
 LAR_PULOS_BAGUNCA = 1.5         # pulinhos por segundo enquanto bagunça a cama
+LAR_MEIA_VIDA_CARINHO_S = 30.0  # teto do carinho: depois de 30 s de carinho recente, ele ensina a metade (0 desliga)
+LAR_RECUPERACAO_CARINHO_H = 8.0 # τ da volta: a carga de carinho vaza com esta constante de tempo
 # <<< frente lar
 # >>> frente modelo_eu (dono: EU-1, EU-2)
 # <<< frente modelo_eu
@@ -303,6 +305,8 @@ _LIMITES = {
     "LAR_VALIDADE_CAMA": (float, 0.1, 10.0),
     "LAR_DURACAO_BAGUNCA": (float, 0.5, 120.0),
     "LAR_PULOS_BAGUNCA": (float, 0.0, 10.0),
+    "LAR_MEIA_VIDA_CARINHO_S": (float, 0.0, 86400.0),
+    "LAR_RECUPERACAO_CARINHO_H": (float, 0.01, 168.0),
     # <<< frente lar
     # >>> frente modelo_eu
     # <<< frente modelo_eu
