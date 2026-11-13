@@ -4,6 +4,7 @@ Mede a guarda de negligência (R1): você presente, mas sem interagir com o pet.
 Pergunta: com você presente e sem carinho nem dispensa por dias, quanto sobem FUGIR e TRAVESSURA?
 Controle: o mesmo protocolo com o modulador de ausência ligado (definir_ausencia(True)), que é a guarda
 de ausência. Se o controle cai e a presença não, a guarda de ausência não cobre a negligência.
+A linha de presença não passa pelo gatilho de 10 minutos (core/negligencia.py): é a linha de base, sem a guarda.
 
 O que roda é o caminho da app, com as mesmas chamadas e a mesma ordem de App.think():
   Drives.update -> Drives.channels -> ComputerSenses.update(atividade, ociosidade, canais, carinho, mouse)

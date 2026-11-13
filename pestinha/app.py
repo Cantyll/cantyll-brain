@@ -43,6 +43,7 @@ from .ajustes import (
     DURACAO_TONTURA as DIZZY_SECONDS,
     INTERVALO_BATIDA as IMPACT_COOLDOWN,
     LIMIAR_CANTO_HZ,
+    NEGLIGENCIA_S,
     PUNICAO_DISPENSA as DISMISS_PENALTY,
     RECOMPENSA_CARINHO as CARESS_REWARD,
     SILENCIO_MOUSE as MOUSE_QUIET,
@@ -60,6 +61,7 @@ from .core.conditioning import Conditioning
 from .core.emotion import PRIORITY, EmotionState
 from .core.episodic import EpisodicMemory
 from .core.homeostasis import Drives
+from .core.negligencia import Negligencia
 from .core.modulos import criar_registro
 from .core.nervous_system import criar_cerebro
 from .core.protesto import Protesto
@@ -190,6 +192,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         self.in_flight = False      # voando depois de um arremesso
         self.last_impact = 0.0
         self.last_poke = 0.0
+        self.negligencia = Negligencia(NEGLIGENCIA_S)   # R1: presente sem interagir por 10 min liga a guarda de ausência
         self.poke_probe = None      # (quando medir, CHEER antes da cutucada)
         self.last_poke_response = None
 
@@ -386,11 +389,13 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         self.drives.update(dt, self.prof, self.asleep, moving, self.emotion.arousal,
                            self.activity == "AWAY", engaged=self.activity in ("PROGRAMMING", "DESIGNING"),
                            preso=self.castigo.dentro, visitado=self.castigo.visita > 0.5)
+        self.negligencia.tick(dt, self.activity != "AWAY")      # R1: o tempo sem interagir só passa com você presente
         self.castigo.tick_lento(dt)
         if caressing:
             self.drives.stimulate("caress", dt)
             self.drives.touched("caress", dt)
             self.memory.on_interaction()
+            self.negligencia.interagiu()
         self.mischief_ctl.ao_carinho(caressing)          # carinho desfaz parte da habituação à dispensa
 
         intensities = self.senses.update(self.activity, idle, self.drives.channels(), caressing, mouse_moving)
@@ -418,7 +423,7 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
         self.pulso_recusa = 0.0
         self.modulos.sentir(intensities, dt)        # frentes: podem acrescentar canais antes do passo
         total_ms = max(1, round(dt * 1000))
-        self.brain.definir_ausencia(self.activity == "AWAY")   # R1: ausente, a rede segura fuga e travessura
+        self.brain.definir_ausencia(self.activity == "AWAY" or self.negligencia.ativa)   # R1: ausente ou negligente, a rede segura fuga e travessura
         # M3: o padrão sensorial deste instante vai para os episódios que começarem agora (replay da noite)
         self.memory.sentidos_atuais = {k: round(v, 3) for k, v in intensities.items()
                                        if v > 0 and k in self.brain.sensory_names}

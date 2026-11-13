@@ -26,6 +26,7 @@ class InteracaoMixin:
         """Você cutucou o pet: ele reage e a rede recebe o toque (ignorado na pausa)."""
         if self._congelado():
             return
+        self.negligencia.interagiu()
         now = time.monotonic()
         if now - self.last_poke < POKE_COOLDOWN:
             return
@@ -69,6 +70,7 @@ class InteracaoMixin:
         """Você pegou o pet: ele sente o arraste e a insatisfação baixa um pouco (você está interagindo)."""
         if self._congelado():
             return
+        self.negligencia.interagiu()
         self.sad.grievance = max(0.0, self.sad.grievance - 0.1)
         self.conditioning.outcome(time.monotonic())
         self.senses.set_dragging(True)
@@ -83,6 +85,7 @@ class InteracaoMixin:
         """Você arremessou o pet: a velocidade vira intensidade do arremesso; ele não aprende com isso na pausa."""
         if self._congelado():
             return
+        self.negligencia.interagiu()
         self.conditioning.outcome(time.monotonic())
         self.senses.thrown(min(1.0, speed / 2000.0))
         self.timeline.note_interaction()
@@ -94,6 +97,7 @@ class InteracaoMixin:
         """Você dispensou uma travessura: ela some, e o tempo até você fechar vira aprendizado (fechar rápido é pior)."""
         if self._congelado():
             return                                   # o objeto some, mas não vira aprendizado na pausa
+        self.negligencia.interagiu()
         self.mischief_ctl.on_dismissed(thing, elapsed, self.prof, time.monotonic())
 
     def arrancar_notebook(self, now):
@@ -146,6 +150,7 @@ class InteracaoMixin:
         """Menu: 'Fazer carinho' (conta como carinho na rede, se não estiver pausado)."""
         if self._congelado():
             return
+        self.negligencia.interagiu()
         self.pet_state.mark_caress()
         self.drives.touched("caress")
         self.memory.on_interaction()
