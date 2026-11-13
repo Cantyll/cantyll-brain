@@ -11,10 +11,11 @@ from . import ajustes
 from .paths import pet_id_valido
 from .store import read_json, read_lines, write_json
 
-# Núcleo neural (docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md, seção 11). "lif" é o padrão e o único pronto;
-# "bio" entra no M1. Um nome que não está pronto volta para "lif", sem trocar a rede em silêncio.
+# Núcleo neural (docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md, seção 11). "lif" é o padrão; "bio" (core/bio/) está
+# pronto desde o T2 e passa pela mesma suíte. Trocar o padrão é PR à parte, decidido pelo Cantyll (V7).
+# Um nome que não está pronto volta para "lif", sem trocar a rede em silêncio.
 CEREBRO = "lif"
-CEREBROS_PRONTOS = ("lif",)
+CEREBROS_PRONTOS = ("lif", "bio")
 
 
 def cerebro_escolhido(nome=None):

@@ -13,7 +13,7 @@ elegibilidade sobre os níveis sensoriais e δ = r − V, aplicada a projeções
 população). O peso efetivo de cada sinapse plástica é base + learned × unidade, a mesma conta do LIF. A troca
 para STDP por pulso é a frente PL-1, em core/bio/plasticidade.py.
 
-O BioBrain ainda não está em config.CEREBROS_PRONTOS: isso é o T2.4.
+Está em config.CEREBROS_PRONTOS desde o T2.4; o padrão segue "lif" até o Cantyll decidir a troca (V7).
 
 Dono: T2. Depois do T2, só a frente NE edita este arquivo (plano, seção 5).
 """

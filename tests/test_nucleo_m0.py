@@ -6,6 +6,7 @@ O comportamento do LIF padrão não muda: estes testes checam isso também.
 
 import json
 import math
+import os
 
 import numpy as np
 import pytest
@@ -117,13 +118,18 @@ def test_learn_aceita_taxa_padrao():
 
 
 def test_criar_cerebro_e_escolha_pela_configuracao():
+    from pestinha.core.bio import BioBrain
     assert isinstance(criar_cerebro("lif", seed=7), LIFBrain)
+    assert isinstance(criar_cerebro("bio", seed=7), BioBrain)
     assert isinstance(criar_cerebro(seed=7), Brain)
     with pytest.raises(ValueError):
-        criar_cerebro("bio")
-    assert config.cerebro_escolhido() == "lif"
+        criar_cerebro("izhikevich")
+    # o padrão do app segue o LIF (V7); o conftest troca só com PESTINHA_CEREBRO
+    assert config.CEREBRO == (os.environ.get("PESTINHA_CEREBRO", "").strip() or "lif")
+    assert config.CEREBROS_PRONTOS == ("lif", "bio")
     assert config.cerebro_escolhido("lif") == "lif"
-    assert config.cerebro_escolhido("bio") == "lif"     # ainda não pronto: volta ao padrão
+    assert config.cerebro_escolhido("bio") == "bio"
+    assert config.cerebro_escolhido("izhikevich") == "lif"   # não pronto: volta ao padrão
 
 
 def test_mesma_semente_de_ruido_mesmo_estado():
