@@ -4,6 +4,8 @@ NE-1 (plano, onda 2): custo e atividade do BioBrain com populações em Izhikevi
     python ferramentas/comparar_izhikevich.py                 # custo e atividade, todas as configurações
     python ferramentas/comparar_izhikevich.py --so custo
     python ferramentas/comparar_izhikevich.py --so atividade --config todas_membrana
+    python ferramentas/comparar_izhikevich.py --calibrar ne2  # QUIET e INHIB contra o LIF, com entrada forte
+    python ferramentas/comparar_izhikevich.py --portao ne2    # portão A (20 sementes) com a chave da NE-2 ligada
 
 Configurações (nenhuma é o padrão do app: o padrão do BioBrain segue sem população em Izhikevich):
 
@@ -12,6 +14,14 @@ Configurações (nenhuma é o padrão do app: o padrão do BioBrain segue sem po
 - todas_spec: todos os interneurônios e motores em Izhikevich (excitatórios e motores RS, inibitórios FS),
   τ da spec e a escala de partida (escala_de_corrente).
 - todas_membrana: o mesmo, com τ sináptico = τ_m que a população tinha no LIF.
+- chaves_ne2: o que ajustes.NE_INIBIDORES_FS = True liga (QUIET e INHIB em FS, τ = τ_m, ganhos de ajustes.py).
+
+--calibrar: taxa de cada população com todos os canais em 1,0 e em 0,6 (onde a INHIB dispara de fato), média de 5
+sementes, LIF contra a configuração com o ganho de ajustes.py e com outros ganhos ao lado.
+
+--portao: liga as chaves da frente em ajustes.py e roda ferramentas/linha_de_base.py --cerebro bio (portão A contra
+o LIF registrado, 20 sementes, 3 cenários). A chave só chega aos processos filhos com o início por fork (Linux);
+nos outros sistemas a ferramenta roda num processo só.
 
 Custo: µs por passo de 1 ms da rede (o Izhikevich integra v em duas metades de 0,5 ms dentro dele), mediana de
 RODADAS, uma thread de BLAS, como medir_custo_bio.py. A fração de um núcleo é µs por passo / 1000. Atividade:
@@ -28,6 +38,7 @@ for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_var, "1")
 
 import argparse  # noqa: E402
+import multiprocessing  # noqa: E402
 import statistics  # noqa: E402
 import sys  # noqa: E402
 import time  # noqa: E402
@@ -37,8 +48,10 @@ import numpy as np  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from pestinha import ajustes  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
 from pestinha.core.bio import BioBrain  # noqa: E402
+from pestinha.core.bio.rede import neuronios_das_chaves  # noqa: E402
 
 RODADAS = 7
 ESTIMULO = {"WORK": 0.8, "TYPING": 0.3}
@@ -65,8 +78,82 @@ CONFIGS = {
 }
 
 
+CHAVES = {"ne2": ("NE_INIBIDORES_FS",)}
+
+
+def _com_chaves(frente):
+    """Os argumentos de BioBrain que as chaves da frente pedem (as outras chaves como estão em ajustes.py)."""
+    antes = {k: getattr(ajustes, k) for k in CHAVES[frente]}
+    try:
+        for k in CHAVES[frente]:
+            setattr(ajustes, k, True)
+        tipos, ganho, tau = neuronios_das_chaves()
+    finally:
+        for k, v in antes.items():
+            setattr(ajustes, k, v)
+    return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau}
+
+
+CONFIGS["chaves_ne2"] = _com_chaves("ne2")
+
+
 def cerebro(config, seed_ruido=42):
     return BioBrain(seed=7, seed_ruido=seed_ruido, **CONFIGS[config])
+
+
+CALIBRAR = {"ne2": ("QUIET", "INHIB")}
+VIZINHAS = ("ALERT", "FOCUS", "CURIOUS", "PLAYFUL", "WATCH")
+
+
+def calibrar(frente, sementes=(3, 7, 11, 13, 17)):
+    """Hz por população (as da frente e as que elas inibem), todos os canais em 1,0 e em 0,6, média das sementes."""
+    alvo = CALIBRAR[frente]
+    nomes = alvo + VIZINHAS
+    base = _com_chaves(frente)
+
+    def medir(**kwargs):
+        por_nivel = {1.0: [], 0.6: []}
+        for semente in sementes:
+            b = BioBrain(seed=semente, seed_ruido=3, **kwargs)
+            for nivel in por_nivel:
+                b.stimulate({c: nivel for c in ns.SENSORY_SPEC})
+                for _ in range(5):
+                    b.step(100)
+                b.disparos[:] = 0
+                for _ in range(30):
+                    b.step(100)
+                taxa = b.disparos / (3.0 * b.pool_sizes)
+                por_nivel[nivel].append([taxa[b._pool_index[n]] for n in nomes])
+        return {nivel: np.mean(v, axis=0) for nivel, v in por_nivel.items()}
+
+    linhas = [("lif", medir(tipos={}))]
+    for fator in (0.8, 1.0, 1.2):
+        ganho = {n: g * fator for n, g in base["ganho"].items()}
+        rotulo = "ganhos de ajustes.py" if fator == 1.0 else f"ganhos de ajustes.py × {fator}"
+        linhas.append((rotulo, medir(tipos=base["tipos"], ganho=ganho, tau_sinaptico=base["tau_sinaptico"])))
+    print(f"Calibração da {frente.upper()} (Hz, média das sementes {', '.join(map(str, sementes))}; "
+          f"ganhos de ajustes.py: {base['ganho']})\n")
+    for nivel in (1.0, 0.6):
+        print(f"Todos os canais em {nivel}\n")
+        print("| configuração | " + " | ".join(nomes) + " |")
+        print("|---|" + "---|" * len(nomes))
+        for rotulo, taxas in linhas:
+            print(f"| {rotulo} | " + " | ".join(f"{x:.1f}" for x in taxas[nivel]) + " |")
+        print()
+
+
+def portao(frente, extra=()):
+    """Portão A da linha de base com as chaves da frente ligadas."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import linha_de_base
+    for k in CHAVES[frente]:
+        setattr(ajustes, k, True)
+    argv = ["linha_de_base.py", "--cerebro", "bio", *extra]
+    if multiprocessing.get_start_method() != "fork" and "--processos" not in extra:
+        argv += ["--processos", "1"]
+    print(f"Chaves ligadas: {', '.join(CHAVES[frente])}\n")
+    sys.argv = argv
+    linha_de_base.main()
 
 
 def custo(config, rodadas=RODADAS):
@@ -116,7 +203,15 @@ def main(argv=None):
     parser.add_argument("--config", choices=sorted(CONFIGS), action="append",
                         help="configuração (repetível); padrão: todas")
     parser.add_argument("--rodadas", type=int, default=RODADAS)
-    args = parser.parse_args(argv)
+    parser.add_argument("--calibrar", choices=sorted(CALIBRAR), help="só a calibração da frente")
+    parser.add_argument("--portao", choices=sorted(CHAVES), help="só o portão A com as chaves da frente ligadas")
+    args, extra = parser.parse_known_args(argv)
+    if args.portao:
+        return portao(args.portao, extra)
+    if extra:
+        parser.error(f"argumentos desconhecidos: {' '.join(extra)}")
+    if args.calibrar:
+        return calibrar(args.calibrar)
     configs = args.config or list(CONFIGS)
 
     if args.so != "atividade":
