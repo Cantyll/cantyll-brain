@@ -3,7 +3,7 @@ BioBrain, T2.2 (plano, T2, PR 2 de 4): estrutura e dinâmica, sem aprendizado.
 
 Nesta fase o BioBrain é o LIFBrain em outra forma: populações explícitas e projeções em listas de
 sinapses. Com a mesma semente, as sinapses saem iguais às do LIF; com a mesma semente de ruído, os pulsos
-também. Aprendizado, replay, SHY, salvar e carregar entram no T2.3.
+também. Aprendizado, replay, SHY, salvar e carregar estão em test_bio_aprendizado.py (T2.3).
 
 Rodar: python -m pytest tests/test_bio_dinamica.py -q
 """
@@ -133,19 +133,6 @@ def test_interface_igual_a_do_lif():
     assert estado_bio["aprendido"] == estado_lif["aprendido"]
     assert bio.learned_summary() == []
     assert bio.avancar(0.25) == 0.25
-
-
-@pytest.mark.parametrize("metodo,args", [
-    ("learn", (1.0, 0.0, 0.1)),
-    ("replay", ({"PLAY": 1.0}, 100, 1.0)),
-    ("downscaling_sono", (0.2,)),
-    ("save", ("x.json",)),
-    ("load", ("x.json",)),
-])
-def test_o_que_falta_avisa_em_vez_de_fingir(metodo, args):
-    """Aprendizado, replay, SHY, salvar e carregar entram no T2.3. Até lá, chamar levanta erro em vez de não fazer nada."""
-    with pytest.raises(NotImplementedError):
-        getattr(BioBrain(seed=7), metodo)(*args)
 
 
 @pytest.mark.parametrize("nome", [

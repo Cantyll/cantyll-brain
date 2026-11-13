@@ -9,11 +9,12 @@ aprendizado faz em semanas: se alguma população morre (PLAYFUL) ou satura (GLO
     python ferramentas/simular_noites.py --sem-shy            # roda também o controle sem SHY
     python ferramentas/simular_noites.py --sem-habituacao     # roda também sem a habituação à dispensa
     python ferramentas/simular_noites.py --pulsos             # o replay simula os pulsos (mais lento, mesmas sinapses)
+    python ferramentas/simular_noites.py --cerebro bio        # o mesmo com o BioBrain (core/bio)
 
 É critério de aceitação de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase
 (tests/test_simulacao_noites.py roda uma versão dela). Com a mesma semente, o resultado se repete.
 
-O que é real: LIFBrain (aprendizado, replay, SHY), EpisodicMemory (episódios em arquivo, escolha
+O que é real: LIFBrain ou BioBrain (aprendizado, replay, SHY), EpisodicMemory (episódios em arquivo, escolha
 do replay), SleepController (a noite inteira, quadro a quadro) e os números de ajustes.py e do perfil.
 
 O que é suposição, e não medida de uso real:
@@ -57,6 +58,7 @@ from pestinha.core import episodic  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
 from pestinha.core.episodic import EpisodicMemory  # noqa: E402
 from pestinha.core.habituacao import Habituacao  # noqa: E402
+from pestinha.core.bio import BioBrain  # noqa: E402
 from pestinha.core.nervous_system import LIFBrain  # noqa: E402
 from pestinha.mind.sleep import SleepController  # noqa: E402
 
@@ -94,10 +96,11 @@ POPULACOES = ("PLAYFUL", "CALM", "FRUSTRATION", "GLOOM", "CHEER", "SAD")
 DIAS_PADRAO = (0, 1, 2, 3, 5, 10, 15, 20, 25, 30)
 
 
-class _RedeDeSimulacao(LIFBrain):
+class _ReplaySemPulsos:
     """
-    LIFBrain em que o replay não simula os pulsos. O aprendizado do LIFBrain usa os níveis sensoriais, a
-    elegibilidade e δ; os pulsos não entram na conta. Pular o passo da rede dá as mesmas sinapses.
+    Replay que não simula os pulsos. O aprendizado do LIFBrain (e do BioBrain, que tem a mesma regra até o
+    PL-1) usa os níveis sensoriais, a elegibilidade e δ; os pulsos não entram na conta. Pular o passo da rede
+    dá as mesmas sinapses.
     """
 
     def replay(self, sentidos, ms, delta, rate=ns.LEARN_RATE_PADRAO, teto=None):
@@ -108,6 +111,18 @@ class _RedeDeSimulacao(LIFBrain):
             self.stimulate(entrada)
             self.learn(delta, 0.0, chunk / 1000.0, rate, teto)
             restante -= chunk
+
+
+class _RedeDeSimulacao(_ReplaySemPulsos, LIFBrain):
+    """LIFBrain com o replay sem pulsos."""
+
+
+class _RedeDeSimulacaoBio(_ReplaySemPulsos, BioBrain):
+    """BioBrain com o replay sem pulsos."""
+
+
+# nome -> (cérebro de verdade, cérebro com o replay sem pulsos)
+CEREBROS = {"lif": (LIFBrain, _RedeDeSimulacao), "bio": (BioBrain, _RedeDeSimulacaoBio)}
 
 
 class _Necessidades:
@@ -226,7 +241,8 @@ def medir(brain):
     """
     por_contexto = {}
     for nome, sentidos, _ in CONTEXTOS:
-        gemeo = LIFBrain(seed=brain.seed, temperament=brain.temperament, seed_ruido=MEDIDA_SEMENTE)
+        classe = BioBrain if isinstance(brain, BioBrain) else LIFBrain
+        gemeo = classe(seed=brain.seed, temperament=brain.temperament, seed_ruido=MEDIDA_SEMENTE)
         gemeo.learned[:] = brain.learned
         gemeo._apply_learning()
         gemeo.stimulate(sentidos)
@@ -243,11 +259,13 @@ def medir(brain):
     return uso, por_contexto
 
 
-def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, sonos=1, **trocas):
+def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, sonos=1, cerebro="lif",
+            **trocas):
     """
     Roda `noites` dias e noites. dias: em quais manhãs medir (padrão DIAS_PADRAO; o dia 0 e o último entram sempre).
     pulsos: True simula os pulsos no replay, como o app (mais lento, mesmas sinapses no LIFBrain).
     sonos: em quantos sonos cada noite é picada (1: a noite inteira de uma vez).
+    cerebro: "lif" (LIFBrain) ou "bio" (BioBrain).
     trocas: valores de ajustes.py só para esta simulação (por exemplo HOMEOSTASE_SHY=0.0, para comparar).
     Devolve uma lista de linhas (dict), uma por manhã medida. A última traz também "aprendido".
     """
@@ -262,7 +280,7 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
             pasta = pilha.enter_context(tempfile.TemporaryDirectory())
         pasta = Path(pasta)
         memoria = EpisodicMemory(pasta / "episodes.jsonl", pasta / "preferences.json")
-        brain = (LIFBrain if pulsos else _RedeDeSimulacao)(seed=semente, seed_ruido=semente + 1000)
+        brain = CEREBROS[cerebro][0 if pulsos else 1](seed=semente, seed_ruido=semente + 1000)
         sono = SleepController(None, _Necessidades(), memoria, lambda: False)
         rng = np.random.default_rng(semente)
         relogio = np.random.default_rng(semente + 2000)
@@ -319,20 +337,21 @@ def main():
     parser.add_argument("--sem-habituacao", action="store_true",
                         help="roda também sem a habituação à dispensa (HABITUACAO_DISPENSA = 0), para comparar")
     parser.add_argument("--pulsos", action="store_true", help="simula os pulsos no replay, como o app (mais lento)")
+    parser.add_argument("--cerebro", default="lif", choices=sorted(CEREBROS), help="lif (padrão) ou bio")
     parser.add_argument("--json", help="grava as linhas neste arquivo")
     args = parser.parse_args()
 
     regras = CENARIOS[args.cenario]
     print(f"Cenário {args.cenario}: {regras['descricao']}. Perfil {regras['perfil']}, semente {args.semente}, "
-          f"{args.noites} noites, {args.sonos} sono(s) por noite.\n")
-    saida = {"com_shy": simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos)}
+          f"{args.noites} noites, {args.sonos} sono(s) por noite, cérebro {args.cerebro}.\n")
+    saida = {"com_shy": simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, cerebro=args.cerebro)}
     imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}, HABITUACAO_DISPENSA = {ajustes.HABITUACAO_DISPENSA}, "
              f"RECUPERACAO_DISPENSA_H = {ajustes.RECUPERACAO_DISPENSA_H}", saida["com_shy"])
     if args.sem_shy:
-        saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, HOMEOSTASE_SHY=0.0)
+        saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, cerebro=args.cerebro, HOMEOSTASE_SHY=0.0)
         imprimir("Sem SHY (HOMEOSTASE_SHY = 0)", saida["sem_shy"])
     if args.sem_habituacao:
-        saida["sem_habituacao"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos,
+        saida["sem_habituacao"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, cerebro=args.cerebro,
                                           HABITUACAO_DISPENSA=0.0)
         imprimir("Sem habituação à dispensa (HABITUACAO_DISPENSA = 0)", saida["sem_habituacao"])
     if args.json:

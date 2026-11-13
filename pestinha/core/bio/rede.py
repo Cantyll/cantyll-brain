@@ -8,24 +8,32 @@ LIF e o mesmo sorteio, na mesma ordem: com a mesma semente, as sinapses saem igu
 mesma semente de ruído os pulsos também. As tabelas de populações e de conexões vêm de core/nervous_system.py,
 que fica congelado (decisão V1), então não há cópia para sair de sincronia.
 
-Estado deste PR (T2.2): estrutura e dinâmica. Aprendizado, replay, SHY, salvar e carregar entram no T2.3;
-até lá esses métodos levantam NotImplementedError, e o BioBrain não está em config.CEREBROS_PRONTOS.
+O aprendizado também é o do LIFBrain: a matriz `learned` (canal sensorial × população plástica) com
+elegibilidade sobre os níveis sensoriais e δ = r − V, aplicada a projeções plásticas (uma por par canal ×
+população). O peso efetivo de cada sinapse plástica é base + learned × unidade, a mesma conta do LIF. A troca
+para STDP por pulso é a frente PL-1, em core/bio/plasticidade.py.
+
+O BioBrain ainda não está em config.CEREBROS_PRONTOS: isso é o T2.4.
 
 Dono: T2. Depois do T2, só a frente NE edita este arquivo (plano, seção 5).
 """
 import math
+import time
 from collections import deque
 
 import numpy as np
 
 from ...ajustes import AUSENCIA_CORRENTE
+from ...log import log
+from ...mathutil import valor_real
+from ...store import read_json, write_json
 from .. import nervous_system as ns
-from ..nervous_system import Brain, LEARN_RATE_PADRAO
+from ..homeostase_sinaptica import downscaling, saturacao
+from ..nervous_system import Brain, LEARN_MAX, LEARN_MIN, LEARN_RATE_PADRAO
 from .neuronios import Neuronio
 from .projecoes import compilar, projecao_de_bloco
 
 BIO_VERSION = 1
-_PENDENTE = "entra no T2.3 (aprendizado, replay, SHY, salvar e carregar)"
 
 
 class Pool(dict):
@@ -132,14 +140,25 @@ class BioBrain(Brain):
                 if a != b and (a in ns.DECISION_MOTORS) == (b in ns.DECISION_MOTORS):
                     ligar(a, b, -(ns.STARTLE_INHIBITION if a == "STARTLE" else ns.LATERAL_INHIBITION), 0.7)
 
-        self.sinapses = compilar(self.projecoes, self.N, self.Nl, Ns)
-        self.n_synapses = len(self.sinapses)
-
-        # aprendizado (T2.3): a matriz existe para o estado e para quem a lê; ainda não muda as sinapses
+        # projeções plásticas canal sensorial -> população plástica (sorteio próprio, como no LIF: não muda o resto)
+        plastic_rng = np.random.default_rng(self.seed + 1)
         self.plastic_posts = list(ns.PLASTIC_POSTS)
-        self.learned = np.zeros((len(self.sensory_names), len(self.plastic_posts)))
+        self.post_sign = np.array([ns.PLASTIC_POSTS[name] for name in self.plastic_posts])
+        P = len(self.plastic_posts)
+        for i, c in enumerate(self.sensory_names):
+            a = self.pool(c)
+            for j, post in enumerate(self.plastic_posts):
+                b = self.pool(post)
+                mask = plastic_rng.random((a["n"], b["n"])) < ns.PLASTIC_DENSITY
+                strength = plastic_rng.lognormal(0.0, 0.25, (a["n"], b["n"])) / np.exp(0.25 ** 2 / 2)
+                self.projecoes.append(projecao_de_bloco(c, post, a["start"], b["start"], mask * strength, plastica=True,
+                                                        celula=i * P + j, limites=(LEARN_MIN, LEARN_MAX)))
+        self.learned = np.zeros((len(self.sensory_names), P))
         self.eligibility = np.zeros(len(self.sensory_names))
         self._levels = np.zeros(len(self.sensory_names))
+
+        self.sinapses = compilar(self.projecoes, self.N, self.Nl, Ns)
+        self.n_synapses = self.sinapses.n_fixas                 # como no LIF: as que existem sem aprendizado
 
         # ---------------- estado ----------------
         self.spikes = np.zeros(self.N)
@@ -286,7 +305,9 @@ class BioBrain(Brain):
 
     def describe(self):
         """Resumo da rede: quantos neurônios e sinapses."""
-        return f"Bio {self.N} neurônios, {self.n_synapses} sinapses em {len(self.projecoes)} projeções"
+        plasticas = sum(1 for p in self.projecoes if p.plastica)
+        return (f"Bio {self.N} neurônios, {self.n_synapses} sinapses em {len(self.projecoes) - plasticas} projeções "
+                f"fixas e {plasticas} plásticas")
 
     def estado(self):
         """Resumo serializável: versão, tempo simulado, habituação por canal, aprendizado e taxas por população."""
@@ -305,19 +326,115 @@ class BioBrain(Brain):
             "taxas": self.pool_rates(),
         }
 
-    # ---------------- T2.3 ----------------
+    # ---------------- aprendizado ----------------
 
     def learn(self, reward, expected, dt_s, rate=LEARN_RATE_PADRAO, teto=None):
-        raise NotImplementedError(f"BioBrain.learn {_PENDENTE}")
+        """
+        Chamar a cada passo: atualiza a elegibilidade (o que estava ativo nos últimos segundos) e, se o erro de
+        predição δ = reward − expected não for zero, ajusta as sinapses plásticas. A regra é a do LIFBrain.
+        teto: com fração dada, o empurrão perde força perto desse limite (replay homeostático).
+        """
+        k = 1.0 - math.exp(-dt_s / ns.ELIGIBILITY_TAU)
+        self.eligibility += (self._levels - self.eligibility) * k
+        delta_predicao = reward - expected
+        if delta_predicao == 0.0:
+            return
+        change = rate * delta_predicao * dt_s * np.outer(self.eligibility, self.post_sign)
+        if teto is not None:
+            change = change * saturacao(change, self.learned, teto, LEARN_MAX, LEARN_MIN)
+        self.learned = np.clip(self.learned + change, LEARN_MIN, LEARN_MAX)
+        self._apply_learning()
+
+    def _apply_learning(self):
+        """Leva a matriz `learned` para o peso das sinapses plásticas."""
+        self.sinapses.aplicar(self.learned.ravel())
 
     def replay(self, sentidos, ms, delta, rate=LEARN_RATE_PADRAO, teto=None):
-        raise NotImplementedError(f"BioBrain.replay {_PENDENTE}")
+        """
+        Replay noturno (M3, spec seção 9.4): reativa o padrão sensorial de um episódio por `ms` milissegundos,
+        com δ = delta no aprendizado. Só os canais sensoriais contam; os que faltam valem 0.
+        """
+        entrada = {k: v for k, v in sentidos.items() if k in self.sensory_names}
+        restante = int(ms)
+        while restante > 0:
+            chunk = min(100, restante)
+            self.stimulate(entrada)
+            self.step(chunk)
+            self.learn(delta, 0.0, chunk / 1000.0, rate, teto)
+            restante -= chunk
 
     def downscaling_sono(self, fracao):
-        raise NotImplementedError(f"BioBrain.downscaling_sono {_PENDENTE}")
+        """Homeostase sináptica (SHY, decisão D4): o sono desfaz `fracao` de todas as sinapses aprendidas."""
+        self.learned = downscaling(self.learned, fracao)
+        self._apply_learning()
+
+    # ---------------- persistência ----------------
 
     def save(self, path):
-        raise NotImplementedError(f"BioBrain.save {_PENDENTE}")
+        """
+        Grava habituação, aprendizado e o tamanho das populações (escrita atômica). As sinapses não vão para o
+        arquivo: com a mesma semente elas saem iguais. Quando o crescimento mudar a estrutura (CR-1), as
+        projeções passam a ser gravadas.
+        """
+        data = {
+            "tipo": "bio",
+            "version": BIO_VERSION,
+            "seed": self.seed,
+            "saved_at": time.time(),
+            "populacoes": {p["name"]: p["n"] for p in self.pools},
+            "efficacy": {name: [round(float(x), 5) for x in self.p[self.pool(name).fatia]] for name in self.sensory_names},
+            "learned": {
+                c: {post: round(float(self.learned[i, j]), 6) for j, post in enumerate(self.plastic_posts)}
+                for i, c in enumerate(self.sensory_names)
+            },
+        }
+        write_json(path, data)
 
     def load(self, path):
-        raise NotImplementedError(f"BioBrain.load {_PENDENTE}")
+        """
+        Restaura habituação e aprendizado. Tudo é validado antes de aplicar: tipo, versão, semente, populações,
+        valores finitos e dentro do domínio. Se algo falhar, nada muda. Save do LIF não é lido (decisão D7).
+        """
+        data = read_json(path, default=None)
+        if not isinstance(data, dict):
+            return False
+        try:
+            if data.get("tipo") != "bio" or data.get("version") != BIO_VERSION or data.get("seed") != self.seed:
+                return False
+            if data.get("populacoes") != {p["name"]: p["n"] for p in self.pools}:
+                return False
+            elapsed = max(0.0, time.time() - valor_real(data["saved_at"], 0.0, 1e13))
+
+            saved_learned = data.get("learned", {})
+            if not isinstance(saved_learned, dict):
+                return False
+            learned = np.array(self.learned, copy=True)
+            for i, c in enumerate(self.sensory_names):
+                por_canal = saved_learned.get(c, {})
+                if not isinstance(por_canal, dict):
+                    return False
+                for j, post in enumerate(self.plastic_posts):
+                    learned[i, j] = valor_real(por_canal.get(post, 0.0), LEARN_MIN, LEARN_MAX)
+
+            saved_eff = data.get("efficacy", {})
+            if not isinstance(saved_eff, dict):
+                return False
+            recuperado = {}
+            for name in self.sensory_names:
+                if name not in saved_eff:
+                    continue
+                sl = self.pool(name).fatia
+                saved = np.array(saved_eff[name], dtype=float)
+                if saved.shape != (self.pool(name)["n"],) or not np.isfinite(saved).all() or ((saved < 0) | (saved > 1)).any():
+                    return False
+                recuperado[name] = np.clip(1.0 - (1.0 - saved) * np.exp(-elapsed / self.s_tau_rec[sl]), 0.0, 1.0)
+
+            self.learned[:] = learned
+            self._apply_learning()
+            for name, valores in recuperado.items():
+                self.p[self.pool(name).fatia] = valores
+            self.restored_after = elapsed
+            return True
+        except Exception as error:
+            log(f"[bio] estado ilegível ({error}); começando do zero")
+            return False
