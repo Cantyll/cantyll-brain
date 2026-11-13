@@ -22,3 +22,4 @@ python ferramentas/gerar_doc_rede.py
 | `medir_cartazes.py` | Mede se cada frase do cartazes.txt de cada pet cabe na placa em que aparece, com as fontes de verdade. |
 | `medir_custo_izhikevich.py` | Mede o custo de um passo do M1 (Izhikevich, passo de 0,5 ms) ao lado do LIF atual, na mesma máquina. |
 | `medir_custo_passo.py` | Mede quanto custa um passo da rede, em fração de um núcleo de CPU (docs/CUSTO_DO_PASSO.md). |
+| `medir_negligencia.py` | Mede a guarda de negligência (R1): você presente, mas sem interagir com o pet. |
