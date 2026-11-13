@@ -213,8 +213,12 @@ PL_CRITICO_TAXA = 0.5           # por passo de 0,1 s: quão rápido o crítico a
                                 # recompensa levam δ a ~0%; com 0,3 o PEDIDO ainda subia 10% em mais 20 pares)
 PL_CRITICO_TAU_S = 30.0         # τ_V: até quantos segundos depois de uma pista a recompensa ainda conta como dela
 PL_CRITICO_LIMITE = 5.0         # |peso| máximo de cada canal no crítico (só para não divergir)
+PL_ACH = False                  # ACh na taxa. Desligada: fator 1. Com ela, a regra 8 falha no misto e no carinhoso
+                                # (medido em 2026-11-13, ferramentas/comparar_pl1.py); volta com a STDP (PL-1, parte 2)
 PL_ACH_TAU_S = 30.0             # τ da acetilcolina (spec, seção 8)
 PL_ACH_REF_HZ = 15.0            # taxa do FOCUS que vale ACh 1 (medido: semente 7, programando, ~15 Hz)
+PL_ACH_MEDIA_H = 24.0           # τ da média lenta da ACh (h): a taxa é dividida por (0,5 + média)
+PL_ACH_MEDIA_INICIAL = 0.3      # média de quem ainda não tem histórico (escolhido: ~30% do dia programando)
 # Canais que o crítico lê: as pistas, que vêm antes de uma interação. Contexto (atividade, tédio, carência) e a
 # própria sensação da recompensa (CARESS, DISMISS) ficam de fora: senão V vira a recompensa média de cada contexto,
 # que é quase zero, e quase nada mais ensina (ver core/bio/plasticidade.py). None: todos os canais.
@@ -347,6 +351,8 @@ _LIMITES = {
     "PL_CRITICO_LIMITE": (float, 0.0, 1000.0),
     "PL_ACH_TAU_S": (float, 0.1, 3600.0),
     "PL_ACH_REF_HZ": (float, 0.1, 500.0),
+    "PL_ACH_MEDIA_H": (float, 0.01, 720.0),
+    "PL_ACH_MEDIA_INICIAL": (float, 0.0, 1.0),
     # <<< frente plasticidade
 }
 
