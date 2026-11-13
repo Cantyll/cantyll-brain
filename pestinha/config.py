@@ -23,6 +23,57 @@ def cerebro_escolhido(nome=None):
     return nome if nome in CEREBROS_PRONTOS else "lif"
 
 
+# ============================================================
+# FRENTES (trilhos do plano, T1): cada frente nova entra como um módulo (core/modulos.py)
+# ============================================================
+
+# Chave de cada frente. Todas desligadas por padrão (R7): o PR de uma frente nunca muda o padrão.
+# Ligar por padrão é um PR à parte, de uma linha, decidido pelo Cantyll.
+FRENTES = {
+    "lar": False,            # LAR-1 e LAR-3: o canto com cama, a brincadeira e a comida do lar
+    "modelo_eu": False,      # EU-1: preditor do próprio estado (surpresa e tédio)
+    "hipocampo": False,      # ME-1: episódios de qualquer momento marcante
+    "diario": False,         # AC-1: fotografia diária
+    "gravador": False,       # AC-3: gravação dos sentidos para os gêmeos de ablação
+    "respiracao": False,     # TA-1: oscilador de respiração
+    "conversa": False,       # LI-0: caixa de conversa e balão de fala
+    "bandeja_estado": False,  # LAR-4: estado dele no ícone da bandeja
+}
+
+# Onde mora a fábrica de cada frente: o módulo Python precisa ter `criar(app)` (core/modulos.py).
+# None: a frente não entra pelo registro (muda uma tela, por exemplo).
+MODULOS_DAS_FRENTES = {
+    "lar": "pestinha.mind.lar_ctl",
+    "modelo_eu": "pestinha.core.modelo_eu",
+    "hipocampo": "pestinha.core.hipocampo",
+    "diario": "pestinha.core.diario",
+    "gravador": "pestinha.core.gravador",
+    "respiracao": "pestinha.core.respiracao",
+    "conversa": "pestinha.ui.conversa",
+    "bandeja_estado": None,
+}
+
+# Permissões que pertencem a uma frente: só existem, e só aparecem na tela inicial, com a frente ligada.
+# frente: (título do grupo, [(chave, padrão, rótulo, descrição)]). Toda permissão de frente começa desligada.
+PERMISSOES_DAS_FRENTES = {
+    "gravador": ("Gravação", [
+        ("gravar_sentidos", False, "Gravar os sentidos",
+         "Grava o nível de cada sentido da rede, para refazer o dia numa cópia da rede (gêmeos). "
+         "Só categorias e números, nunca títulos ou conteúdo. Arquivo à parte, apagado com os dados."),
+    ]),
+    "conversa": ("Conversa", [
+        ("conversa", False, "Conversa escrita",
+         "Uma caixa para escrever para ele. O texto só vai para o módulo de linguagem e não é gravado."),
+    ]),
+}
+
+
+def frentes_ligadas(frentes=None):
+    """Nomes das frentes ligadas, na ordem de FRENTES."""
+    frentes = FRENTES if frentes is None else frentes
+    return [nome for nome, ligada in frentes.items() if ligada]
+
+
 EMOTIONS =["feliz", "contente", "observando", "curioso", "bravo", "triste", "assustado", "dramatico"]
 
 EMOTION_NAMES = {
@@ -99,6 +150,30 @@ PERMISSION_GROUPS = [
         ("mostrar_emocao", "Mostrar nome da emoção", "Texto pequeno embaixo dele (só no modo teste)."),
     ]),
 ]
+_PERMISSION_GROUPS_BASE = PERMISSION_GROUPS
+_DEFAULT_PERMISSIONS_BASE = DEFAULT_PERMISSIONS
+
+
+def permissoes_padrao(frentes=None):
+    """As permissões padrão mais as das frentes ligadas (todas desligadas). Frente desligada: nada muda."""
+    perms = dict(_DEFAULT_PERMISSIONS_BASE)
+    for nome in frentes_ligadas(frentes):
+        for chave, padrao, _rotulo, _descricao in PERMISSOES_DAS_FRENTES.get(nome, ("", []))[1]:
+            perms[chave] = padrao
+    return perms
+
+
+def grupos_de_permissao(frentes=None):
+    """Os grupos da tela inicial mais os das frentes ligadas, antes do grupo Teste."""
+    extras = [(titulo, [(chave, rotulo, descricao) for chave, _p, rotulo, descricao in itens])
+              for titulo, itens in (PERMISSOES_DAS_FRENTES[n] for n in frentes_ligadas(frentes)
+                                    if n in PERMISSOES_DAS_FRENTES)]
+    return _PERMISSION_GROUPS_BASE[:-1] + extras + _PERMISSION_GROUPS_BASE[-1:]
+
+
+# o que a tela inicial e o arquivo de permissões usam: com todas as frentes desligadas, igual à base
+DEFAULT_PERMISSIONS = permissoes_padrao()
+PERMISSION_GROUPS = grupos_de_permissao()
 
 
 def permissoes_validas(novo):

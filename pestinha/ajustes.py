@@ -119,6 +119,7 @@ FELIZ_APOS_CARINHO = 1.5        # s com os olhinhos fechados de felicidade depoi
 # DECISÕES PELA REDE: cada uma é um neurônio motor. O limiar é a taxa de disparo
 # (Hz) dele; a frequência de uma travessura ou de uma bolinha é a taxa vezes o ganho.
 # ---------------------------------------------------------------------------
+# >>> decisões (dono: frente NE; outras frentes não editam entre estas marcas)
 LIMIAR_SENTAR_HZ = 6.0          # SENTAR acima disso: senta
 LIMIAR_LEVANTAR_HZ = 3.0        # SENTAR abaixo disso: levanta (histerese)
 LIMIAR_FUGA_HZ = 2.0            # FUGIR acima disso enche a vontade de fugir; abaixo, ela vaza
@@ -127,6 +128,7 @@ LIMIAR_CANTO_HZ = 3.0           # CANTO acima disso: vai para o cantinho
 GANHO_TRAVESSURA = 0.002        # travessuras por segundo, por Hz do motor TRAVESSURA
 GANHO_CARTAZ = 0.5              # cartazes por segundo, por Hz do motor CARTAZ
 GANHO_PAPEL = 0.05              # bolinhas de papel por segundo, por Hz do motor PAPEL
+# <<< decisões
 
 # ---------------------------------------------------------------------------
 # Rosto e janela
@@ -168,6 +170,27 @@ REPLAY_MS_POR_FRAME = 100       # simulação de replay por quadro, para a tela 
 # ---------------------------------------------------------------------------
 HOMEOSTASE_SHY = 0.2            # um sono de uma noite de dívida desfaz essa fração das sinapses aprendidas (dívida menor: 1 − 0,8^fração)
 HOMEOSTASE_TETO = 0.5           # o replay para de empurrar uma sinapse em 50% do seu limite (LEARN_MAX / LEARN_MIN)
+
+# ---------------------------------------------------------------------------
+# FRENTES (seções reservadas pelo T1; plano, seção 5). Cada frente põe os próprios números só entre as
+# suas marcas, aqui e em _LIMITES. A chave que liga a frente fica em config.FRENTES.
+# ---------------------------------------------------------------------------
+# >>> frente lar (dono: LAR-1, LAR-3)
+# <<< frente lar
+# >>> frente modelo_eu (dono: EU-1, EU-2)
+# <<< frente modelo_eu
+# >>> frente hipocampo (dono: ME-1)
+# <<< frente hipocampo
+# >>> frente diario (dono: AC-1)
+# <<< frente diario
+# >>> frente gravador (dono: AC-3)
+# <<< frente gravador
+# >>> frente respiracao (dono: TA-1)
+# <<< frente respiracao
+# >>> frente conversa (dono: LI-0)
+# <<< frente conversa
+# >>> frente bandeja_estado (dono: LAR-4)
+# <<< frente bandeja_estado
 
 # ---------------------------------------------------------------------------
 # Validação
@@ -249,6 +272,7 @@ _LIMITES = {
     "PEDIDO_VALIDADE_S": (float, 1.0, 600.0),
     "JANELA_PEDIDOS_S": (float, 60.0, 86400.0),
     "FELIZ_APOS_CARINHO": (float, 0.0, 30.0),
+    # >>> decisões
     "LIMIAR_SENTAR_HZ": (float, 0.0, 200.0),
     "LIMIAR_LEVANTAR_HZ": (float, 0.0, 200.0),
     "LIMIAR_FUGA_HZ": (float, 0.0, 200.0),
@@ -257,9 +281,26 @@ _LIMITES = {
     "GANHO_TRAVESSURA": (float, 0.0, 1.0),
     "GANHO_CARTAZ": (float, 0.0, 1.0),
     "GANHO_PAPEL": (float, 0.0, 1.0),
+    # <<< decisões
     "LADO_JANELA_PET": (int, 100, 1000),
     "ZZZ_QUANTIDADE": (int, 0, 20),
     "ZZZ_PERIODO": (float, 0.1, 60.0),
+    # >>> frente lar
+    # <<< frente lar
+    # >>> frente modelo_eu
+    # <<< frente modelo_eu
+    # >>> frente hipocampo
+    # <<< frente hipocampo
+    # >>> frente diario
+    # <<< frente diario
+    # >>> frente gravador
+    # <<< frente gravador
+    # >>> frente respiracao
+    # <<< frente respiracao
+    # >>> frente conversa
+    # <<< frente conversa
+    # >>> frente bandeja_estado
+    # <<< frente bandeja_estado
 }
 
 

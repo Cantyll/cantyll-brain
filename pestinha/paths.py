@@ -11,6 +11,7 @@ O conteúdo (frases, cartazes, memes, imagens) vem de pets/<pet>/ e depois de as
 A memória tem duas partes:
     memory/                 o que é do app e de você: permissões, rotina, painéis, log
     memory/pets/<pet>/      o que é de cada personagem (PetPaths): rede, memória, homeostase...
+    memory/pets/<pet>/modulos/<módulo>/   estado de cada módulo de frente ligado (core/modulos.py)
 Arquivos da versão antiga (tudo solto em memory/) são migrados por pestinha/migracao.py e os
 originais ficam guardados em memory/legado/<pet>/.
 """
@@ -27,6 +28,7 @@ ROOT = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
         else Path(__file__).resolve().parent.parent)
 
 ID_DE_PET = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")    # vira nome de pasta: nada de "..", "/" ou espaços
+NOME_DE_MODULO = re.compile(r"^[a-z][a-z0-9_]{0,39}$")   # igual a core/modulos.py: vira nome de pasta
 
 
 def pet_id_valido(pet_id):
@@ -99,8 +101,19 @@ class PetPaths:
         """Existe só depois que a migração deste pet foi validada e concluída."""
         return self.base / ".migrado"
 
+    @property
+    def modulos(self):
+        """Pasta com o estado de cada módulo de frente (core/modulos.py): uma subpasta por módulo."""
+        return self.base / "modulos"
+
+    def modulo(self, nome):
+        """Pasta de estado do módulo `nome` (modulos/<nome>/). Criada só quando o módulo grava."""
+        if not (isinstance(nome, str) and NOME_DE_MODULO.match(nome)):
+            raise ValueError(f"nome de módulo inválido: {nome!r}")
+        return self.modulos / nome
+
     def todos(self):
-        """Os oito arquivos de estado do pet: a rede e os sete de memória."""
+        """Os oito arquivos de estado do pet: a rede e os sete de memória (os módulos ficam à parte)."""
         return [self.nervous, self.episodes, self.preferences, self.drives, self.protest,
                 self.sad_protest, self.conditioning, self.castigo]
 

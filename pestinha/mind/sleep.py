@@ -44,6 +44,8 @@ class SleepController:
         self.replay_fila = []       # episódios ainda não reaplicados nesta noite: {sentidos, delta, restante}
         self._reduzir_pendente = 0.0     # fração do SHY deste sono ainda não aplicada (0: nada pendente)
         self.cota = 0.0             # fração de um sono completo que este sono cobra (pela dívida de sono)
+        self.ao_dormir = None       # função sem argumentos chamada ao adormecer (o app liga os módulos, T1)
+        self.ao_acordar = None      # função sem argumentos chamada ao acordar de um sono
 
     def can_sleep(self, body, in_flight, protest_stage, mission):
         """Diz se ele pode dormir agora (no chão, sem ser segurado, sem voar, sem protesto forte e sem missão)."""
@@ -95,6 +97,8 @@ class SleepController:
         self._reduzir_pendente = self.cota
         prefs = self.memory.consolidate()
         self.replay_fila = self._fila(self.memory.escolher_replay(), self.cota)
+        if self.ao_dormir is not None:
+            self.ao_dormir()
         if self.debug():
             log(f"[sono] dormiu ({self.drives.describe()}), dívida {self.cota:.2f} de uma noite, "
                 f"replay de {len(self.replay_fila)} episódios")
@@ -141,6 +145,7 @@ class SleepController:
 
     def wake(self, startled):
         """Acorda: se foi um susto, ele fica assustado; senão, acorda calmo. Replay que não acabou fica para a próxima noite."""
+        estava_dormindo = self.asleep
         if self.asleep:
             self._quitar(self.drives.pressao)
         self.asleep = False
@@ -148,6 +153,8 @@ class SleepController:
         self._reduzir_pendente = 0.0
         if startled:
             self.emotion.force("assustado", 1.2, priority=PRIORITY["assustado"])    # acordou no susto
+        if estava_dormindo and self.ao_acordar is not None:
+            self.ao_acordar()
         if self.debug():
             how = "no susto" if startled else "descansado"
             log(f"[sono] acordou {how} ({self.drives.describe()})")

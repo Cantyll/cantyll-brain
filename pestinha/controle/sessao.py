@@ -117,6 +117,7 @@ class SessaoMixin:
             self.castigo.deslocar(parado)                    # nem a fuga, a entrada e o cartaz
             self.mesa.deslocar(parado)                       # nem o pedido de trabalho
             self.conditioning.deslocar(parado)               # nem as janelas de condicionamento
+            self.modulos.deslocar(parado)                    # nem os prazos dos módulos das frentes
             self._pausado_em = None
             self._ultimo_think = now                         # a retomada não cobra o tempo parado
 
@@ -179,6 +180,7 @@ class SessaoMixin:
             ("o condicionamento", self.conditioning.save),
             ("o protesto", self.protest_ctl.save),
             ("a tristeza", self.sad.save),
+            ("os módulos", self.modulos.salvar),
         ):
             try:
                 gravar()
