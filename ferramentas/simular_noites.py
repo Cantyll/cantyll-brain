@@ -10,6 +10,8 @@ aprendizado faz em semanas: se alguma população morre (PLAYFUL) ou satura (GLO
     python ferramentas/simular_noites.py --sem-habituacao     # roda também sem a habituação à dispensa
     python ferramentas/simular_noites.py --pulsos             # o replay simula os pulsos (mais lento, mesmas sinapses)
     python ferramentas/simular_noites.py --cerebro bio        # o mesmo com o BioBrain (core/bio)
+    python ferramentas/simular_noites.py --lar                # com a frente lar ligada (teto do carinho)
+    python ferramentas/simular_noites.py --cenario so_o_lar   # lar ligado e você sem interagir
 
 É critério de aceitação de toda mudança em dinâmica de neurônio, plasticidade, replay ou homeostase
 (tests/test_simulacao_noites.py roda uma versão dela). Com a mesma semente, o resultado se repete.
@@ -30,6 +32,11 @@ O que é suposição, e não medida de uso real:
 - A noite: ele adormece com pressão de sono PRESSAO_AO_DORMIR e acorda em LIMIAR_ACORDA_PRESSAO. A
   pressão só anda quando não há replay para simular, como numa noite de verdade, em que uma hora de
   sono é muito mais longa que os segundos de replay.
+- O lar (--lar): do que a frente lar muda, só o teto do carinho ensina, e é o que entra aqui (o mesmo
+  cálculo de mind/lar_ctl.py, no relógio da simulação). A travessura de casa não tem recompensa nem
+  episódio, e a carência não entra na rede pelo aprendizado, então nenhuma das duas muda as sinapses.
+  O cenário "so_o_lar" é o lar ligado com você presente e sem interagir: sem dispensa, sem carinho e
+  sem travessura na tela (a do tédio vai para o canto dele).
 - A noite picada (--sonos N): a mesma queda de pressão, repartida por igual em N sonos. Entre um e outro
   ele acorda (carinho, susto, o app reaberto) e adormece de novo na hora. Cada adormecer monta a fila de
   replay outra vez, como no app.
@@ -83,6 +90,8 @@ CENARIOS = {
                    "descricao": "o cenário duro com a taxa de aprendizado do modo teste (4 vezes a normal)"},
     "carinhoso": {"dispensas": 3, "aceitas": 10, "carinhos": 25, "perfil": "normal",
                   "descricao": "3 dispensas, 10 aceitas e 25 carinhos por dia"},
+    "so_o_lar": {"dispensas": 0, "aceitas": 0, "carinhos": 0, "perfil": "normal", "lar": True,
+                 "descricao": "lar ligado e você sem interagir: nada na tela, nenhuma dispensa, nenhum carinho"},
 }
 
 PRESSAO_AO_DORMIR = 0.82        # P de quem ficou ~14 h acordado depois de acordar em 0,25 (ritmo.py)
@@ -169,21 +178,49 @@ def _assenta(brain, sentidos):
     brain.learn(0.0, 0.0, 60.0, 0.0)
 
 
-def _carinho(brain, sentidos, segundos, taxa):
-    """Carinho como no app: o canal CARESS sobe (0,8 s), o teclado para, e a recompensa vale enquanto dura."""
+class TetoCarinho:
+    """
+    O teto do carinho da frente lar (mind/lar_ctl.py, LarModulo.ajustar_recompensa) no relógio da simulação:
+    cada segundo de carinho soma 1 a uma carga que vaza com τ = LAR_RECUPERACAO_CARINHO_H, e o carinho
+    ensina 0,5 ** (carga / LAR_MEIA_VIDA_CARINHO_S).
+    """
+
+    def __init__(self):
+        self.carga = 0.0
+        self.em = None
+
+    def peso(self, agora):
+        """Quanto o carinho ensina em `agora` (s), já com o vazamento desde a última vez."""
+        if self.em is not None:
+            self.carga *= math.exp(-max(0.0, agora - self.em) / (ajustes.LAR_RECUPERACAO_CARINHO_H * 3600.0))
+        self.em = agora
+        meia = ajustes.LAR_MEIA_VIDA_CARINHO_S
+        return 1.0 if meia <= 0 else 0.5 ** (self.carga / meia)
+
+
+def _carinho(brain, sentidos, segundos, taxa, teto=None, agora=0.0):
+    """
+    Carinho como no app: o canal CARESS sobe (0,8 s), o teclado para, e a recompensa vale enquanto dura.
+    teto: o TetoCarinho do lar (None: o carinho ensina inteiro, como sem a frente). agora: hora do começo (s).
+    """
     nivel = 0.0
-    for _ in range(int(round(segundos * 10))):
+    for k in range(int(round(segundos * 10))):
         nivel += (1.0 - nivel) * (1.0 - math.exp(-0.1 / 0.8))
         momento = dict(sentidos, CARESS=nivel, TYPING=0.0)
         brain.stimulate(momento)
-        brain.learn(ajustes.RECOMPENSA_CARINHO, 0.0, 0.1, taxa)
+        if teto is None:
+            brain.learn(ajustes.RECOMPENSA_CARINHO, 0.0, 0.1, taxa)
+        else:
+            brain.learn(ajustes.RECOMPENSA_CARINHO * teto.peso(agora + 0.1 * k), 0.0, 0.1, taxa)
+            teto.carga += 0.1
 
 
-def simular_dia(brain, memoria, rng, cenario, perfil, habituacao=None, relogio=None, inicio_s=0.0):
+def simular_dia(brain, memoria, rng, cenario, perfil, habituacao=None, relogio=None, inicio_s=0.0, teto=None):
     """
     Um dia comprimido: os eventos do cenário, em ordem sorteada, cada um num contexto sorteado.
     habituacao: a Habituacao do app (None: toda dispensa pesa 1). relogio: o sorteio das horas (só a
-    habituação usa; separado de rng para não mudar o resto). inicio_s: a hora em que o dia começa.
+    habituação e o teto usam; separado de rng para não mudar o resto). inicio_s: a hora em que o dia começa.
+    teto: o TetoCarinho do lar (None: sem a frente lar).
     """
     taxa = perfil["learn_rate"]
     eventos = ["dispensa"] * cenario["dispensas"] + ["aceita"] * cenario["aceitas"] + ["carinho"] * cenario["carinhos"]
@@ -194,7 +231,7 @@ def simular_dia(brain, memoria, rng, cenario, perfil, habituacao=None, relogio=N
         atividade, sentidos = _sorteia_contexto(rng)
         _assenta(brain, sentidos)
         if evento == "carinho":
-            _carinho(brain, sentidos, float(rng.uniform(2.0, 5.0)), taxa)
+            _carinho(brain, sentidos, float(rng.uniform(2.0, 5.0)), taxa, teto, inicio_s + float(hora))
             if habituacao is not None:
                 habituacao.desabituar(ajustes.DESABITUACAO_CARINHO)
             continue
@@ -260,12 +297,13 @@ def medir(brain):
 
 
 def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=False, sonos=1, cerebro="lif",
-            **trocas):
+            lar=None, **trocas):
     """
     Roda `noites` dias e noites. dias: em quais manhãs medir (padrão DIAS_PADRAO; o dia 0 e o último entram sempre).
     pulsos: True simula os pulsos no replay, como o app (mais lento, mesmas sinapses no LIFBrain).
     sonos: em quantos sonos cada noite é picada (1: a noite inteira de uma vez).
     cerebro: "lif" (LIFBrain) ou "bio" (BioBrain).
+    lar: True liga a frente lar (o teto do carinho). None: o que o cenário disser (só "so_o_lar" liga).
     trocas: valores de ajustes.py só para esta simulação (por exemplo HOMEOSTASE_SHY=0.0, para comparar).
     Devolve uma lista de linhas (dict), uma por manhã medida. A última traz também "aprendido".
     """
@@ -285,6 +323,7 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
         rng = np.random.default_rng(semente)
         relogio = np.random.default_rng(semente + 2000)
         habituacao = Habituacao(ajustes.HABITUACAO_DISPENSA, ajustes.RECUPERACAO_DISPENSA_H * 3600.0)
+        teto = TetoCarinho() if (regras.get("lar", False) if lar is None else lar) else None
         j = {post: k for k, post in enumerate(brain.plastic_posts)}
         pressoes = np.linspace(PRESSAO_AO_DORMIR, ajustes.LIMIAR_ACORDA_PRESSAO, int(sonos) + 1)
         base = None
@@ -303,7 +342,7 @@ def simular(cenario="duro", noites=30, semente=7, dias=None, pasta=None, pulsos=
             if dia == noites:
                 linhas[-1]["aprendido"] = brain.learned.tolist()
                 break
-            simular_dia(brain, memoria, rng, regras, perfil, habituacao, relogio, dia * DIA_S)
+            simular_dia(brain, memoria, rng, regras, perfil, habituacao, relogio, dia * DIA_S, teto)
             for de, ate in zip(pressoes[:-1], pressoes[1:]):
                 simular_noite(brain, sono, perfil, float(de), float(ate))
     return linhas
@@ -338,21 +377,24 @@ def main():
                         help="roda também sem a habituação à dispensa (HABITUACAO_DISPENSA = 0), para comparar")
     parser.add_argument("--pulsos", action="store_true", help="simula os pulsos no replay, como o app (mais lento)")
     parser.add_argument("--cerebro", default="lif", choices=sorted(CEREBROS), help="lif (padrão) ou bio")
+    parser.add_argument("--lar", action="store_true", help="liga a frente lar (o teto do carinho) em qualquer cenário")
     parser.add_argument("--json", help="grava as linhas neste arquivo")
     args = parser.parse_args()
 
     regras = CENARIOS[args.cenario]
     print(f"Cenário {args.cenario}: {regras['descricao']}. Perfil {regras['perfil']}, semente {args.semente}, "
-          f"{args.noites} noites, {args.sonos} sono(s) por noite, cérebro {args.cerebro}.\n")
-    saida = {"com_shy": simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, cerebro=args.cerebro)}
+          f"{args.noites} noites, {args.sonos} sono(s) por noite, cérebro {args.cerebro}"
+          f"{', lar ligado' if args.lar or regras.get('lar') else ''}.\n")
+    comum = {"pulsos": args.pulsos, "sonos": args.sonos, "cerebro": args.cerebro, "lar": True if args.lar else None}
+    saida = {"com_shy": simular(args.cenario, args.noites, args.semente, **comum)}
     imprimir(f"HOMEOSTASE_SHY = {ajustes.HOMEOSTASE_SHY}, HABITUACAO_DISPENSA = {ajustes.HABITUACAO_DISPENSA}, "
              f"RECUPERACAO_DISPENSA_H = {ajustes.RECUPERACAO_DISPENSA_H}", saida["com_shy"])
     if args.sem_shy:
-        saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, cerebro=args.cerebro, HOMEOSTASE_SHY=0.0)
+        saida["sem_shy"] = simular(args.cenario, args.noites, args.semente, HOMEOSTASE_SHY=0.0, **comum)
         imprimir("Sem SHY (HOMEOSTASE_SHY = 0)", saida["sem_shy"])
     if args.sem_habituacao:
-        saida["sem_habituacao"] = simular(args.cenario, args.noites, args.semente, pulsos=args.pulsos, sonos=args.sonos, cerebro=args.cerebro,
-                                          HABITUACAO_DISPENSA=0.0)
+        saida["sem_habituacao"] = simular(args.cenario, args.noites, args.semente,
+                                          HABITUACAO_DISPENSA=0.0, **comum)
         imprimir("Sem habituação à dispensa (HABITUACAO_DISPENSA = 0)", saida["sem_habituacao"])
     if args.json:
         Path(args.json).write_text(json.dumps(saida, ensure_ascii=False, indent=1), encoding="utf-8")
