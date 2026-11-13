@@ -8,6 +8,12 @@ LIF e o mesmo sorteio, na mesma ordem: com a mesma semente, as sinapses saem igu
 mesma semente de ruído os pulsos também. As tabelas de populações e de conexões vêm de core/nervous_system.py,
 que fica congelado (decisão V1), então não há cópia para sair de sincronia.
 
+Modelos de neurônio (NE-1): cada população de interneurônios ou de motores pode usar Izhikevich (tipos RS, FS,
+IB, CH e LTS, core/bio/neuronios.py) pelo argumento `tipos`. O padrão é nenhuma: toda população segue LIF e a
+rede é bit a bit a do T2. A escala de corrente parte de `escala_de_corrente` (mesma entrada mínima de disparo
+que no LIF) e pode ser ajustada por população com `ganho`; o τ das correntes sinápticas, com `tau_sinaptico`.
+A NE-2 a NE-4 escolhem as populações e calibram.
+
 O aprendizado também é o do LIFBrain: a matriz `learned` (canal sensorial × população plástica) com
 elegibilidade sobre os níveis sensoriais e δ = r − V, aplicada a projeções plásticas (uma por par canal ×
 população). O peso efetivo de cada sinapse plástica é base + learned × unidade, a mesma conta do LIF. A troca
@@ -33,6 +39,7 @@ from ..nervous_system import Brain, LEARN_MAX, LEARN_MIN, LEARN_RATE_PADRAO
 from .neuronios import Neuronio
 from . import plasticidade as pl
 from .projecoes import compilar, projecao_de_bloco
+from .neuronios import TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, escala_de_corrente  # NE-1
 
 BIO_VERSION = 1
 
@@ -55,11 +62,20 @@ class Pool(dict):
 class BioBrain(Brain):
     """Rede neural pulsada com populações e projeções explícitas. Mesma estrutura do LIFBrain nesta fase."""
     SEED = ns.LIFBrain.SEED
+    izhikevich = None                                           # sem população em Izhikevich (padrão)
 
-    def __init__(self, seed=None, temperament=None, seed_ruido=None):
-        """Mesmos argumentos do LIFBrain: seed (o indivíduo), temperament (ganhos) e seed_ruido (ruído reprodutível)."""
+    def __init__(self, seed=None, temperament=None, seed_ruido=None, tipos=None, ganho=None, tau_sinaptico=None):
+        """
+        Mesmos argumentos do LIFBrain: seed (o indivíduo), temperament (ganhos) e seed_ruido (ruído reprodutível).
+        NE-1, para as populações que saem do LIF (padrão: nenhuma): tipos = {população: tipo de Izhikevich};
+        ganho = {população: fator} sobre a escala de corrente (padrão: 1); tau_sinaptico = {população: τ em ms}
+        para as correntes AMPA e GABA (padrão: os da spec, 5 e 10 ms; "membrana" usa o τ_m que ela tinha no LIF).
+        """
         self.seed = self.SEED if seed is None else seed
         self.temperament = dict(temperament or {})
+        self.tipos = dict(tipos or {})
+        ganho = dict(ganho or {})
+        tau_sinaptico = dict(tau_sinaptico or {})
         rng = np.random.default_rng(self.seed)
         self.rng = np.random.default_rng(seed_ruido)
 
@@ -110,7 +126,7 @@ class BioBrain(Brain):
             sl = self.pool(name).fatia
             tau_m[sl], adapt_b[sl], adapt_tau[sl] = tau, b, bt
         tau_m *= rng.uniform(0.9, 1.1, self.N)                  # heterogeneidade (o 1º sorteio, como no LIF)
-        self.neuronios = Neuronio(tau_m[Ns:], adapt_b[Ns:], adapt_tau[Ns:])
+        self._montar_neuronios(tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico)
 
         # ---------------- receptores sensoriais ----------------
         self.s_rate = np.zeros(Ns)
@@ -228,14 +244,61 @@ class BioBrain(Brain):
             sl = self.pool(name).fatia
             self.s_prob[sl] = self.s_rate[sl] * level * 0.001
 
+    def _montar_neuronios(self, tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico):
+        """
+        Divide os neurônios não sensoriais em dois grupos: LIF (`self.neuronios`) e Izhikevich
+        (`self.izhikevich`, só se `tipos` tiver alguma população). Não sorteia nada: as sinapses e a ordem do
+        ruído são as mesmas com qualquer `tipos`. A heterogeneidade de τ_m do LIF entra na escala de corrente.
+        """
+        Ns = self.Ns
+        for name, tipo in self.tipos.items():
+            if name not in self._pool_index or self.pool(name)["group"] == "sensory":
+                raise ValueError(f"população sem neurônio para trocar: {name!r}")
+            if tipo not in TIPOS:
+                raise ValueError(f"tipo de neurônio desconhecido para {name}: {tipo!r}")
+        for name in (*ganho, *tau_sinaptico):
+            if name not in self.tipos:
+                raise ValueError(f"ganho e tau_sinaptico só valem para população em Izhikevich: {name!r}")
+        for name, tau in tau_sinaptico.items():
+            if tau != "membrana" and not (isinstance(tau, (int, float)) and math.isfinite(tau) and tau > 0):
+                raise ValueError(f"tau_sinaptico de {name} precisa ser ms positivo ou 'membrana': {tau!r}")
+        if not self.tipos:
+            self.neuronios = Neuronio(tau_m[Ns:], adapt_b[Ns:], adapt_tau[Ns:])
+            return
+
+        tipo_de = np.full(self.N, "", dtype=object)
+        escala = np.zeros(self.N)
+        tau_ampa = np.full(self.N, TAU_AMPA)
+        tau_gaba = np.full(self.N, TAU_GABA)
+        for name, tipo in self.tipos.items():
+            sl = self.pool(name).fatia
+            tipo_de[sl] = tipo
+            escala[sl] = escala_de_corrente(tipo, tau_m[sl]) * float(ganho.get(name, 1.0))
+            tau = tau_sinaptico.get(name)
+            if tau is not None:
+                tau_ampa[sl] = tau_gaba[sl] = tau_m[sl] if tau == "membrana" else float(tau)
+        locais_izh = np.flatnonzero(tipo_de[Ns:] != "")
+        locais_lif = np.flatnonzero(tipo_de[Ns:] == "")
+        lif = locais_lif + Ns
+        self.neuronios = Neuronio(tau_m[lif], adapt_b[lif], adapt_tau[lif])
+        g = locais_izh + Ns
+        self.izhikevich = Izhikevich(tipo_de[g], escala[g], tau_ampa[g], tau_gaba[g])
+        self._locais_lif, self._locais_izh = locais_lif, locais_izh
+        # corrente de ausência (R1) nos índices de cada grupo
+        self._ausencia_lif = np.flatnonzero(np.isin(locais_lif, self._idx_ausencia))
+        self._ausencia_izh = np.flatnonzero(np.isin(locais_izh, self._idx_ausencia))
+
     def _substep(self):
         """Um passo de 1 ms: propaga os pulsos do passo anterior pelas sinapses, integra, dispara e habitua."""
         rng = self.rng
         Ns = self.Ns
-        corrente = self.sinapses.propagar(self.spikes * self.pre_gain, np.flatnonzero(self.spikes))
-        ruido = ns.NOISE_SIGMA * rng.standard_normal(self.Nl)
-        disparou = self.neuronios.passo(corrente, ruido, self._idx_ausencia if self.ausente else None,
-                                        AUSENCIA_CORRENTE)
+        if self.izhikevich is None:
+            corrente = self.sinapses.propagar(self.spikes * self.pre_gain, np.flatnonzero(self.spikes))
+            ruido = ns.NOISE_SIGMA * rng.standard_normal(self.Nl)
+            disparou = self.neuronios.passo(corrente, ruido, self._idx_ausencia if self.ausente else None,
+                                            AUSENCIA_CORRENTE)
+        else:
+            disparou = self._passo_misto(rng)
 
         s_fired = rng.random(Ns) < self.s_prob
         self.p[s_fired] *= (1.0 - self.s_d[s_fired])           # habituação: depressão sináptica...
@@ -247,6 +310,18 @@ class BioBrain(Brain):
         ativos = np.flatnonzero(self.spikes)
         self.trace[ativos] = 1.0
         self.pool_counts += np.bincount(self._pool_de[ativos], minlength=len(self.pools))
+
+    def _passo_misto(self, rng):
+        """O passo dos neurônios com os dois grupos: LIF recebe a corrente somada; Izhikevich, separada por sinal."""
+        exc, inh = self.sinapses.propagar_por_sinal(self.spikes * self.pre_gain, np.flatnonzero(self.spikes))
+        ruido = ns.NOISE_SIGMA * rng.standard_normal(self.Nl)
+        lif, izh = self._locais_lif, self._locais_izh
+        disparou = np.zeros(self.Nl, dtype=bool)
+        disparou[lif] = self.neuronios.passo(exc[lif] + inh[lif], ruido[lif],
+                                             self._ausencia_lif if self.ausente else None, AUSENCIA_CORRENTE)
+        disparou[izh] = self.izhikevich.passo(exc[izh], inh[izh], ruido[izh],
+                                              self._ausencia_izh if self.ausente else None, AUSENCIA_CORRENTE)
+        return disparou
 
     def step(self, dt_ms):
         """Avança a rede `dt_ms` milissegundos (em passos de 1 ms, no máximo 400 por chamada)."""
