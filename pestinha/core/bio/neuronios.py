@@ -131,10 +131,15 @@ class Izhikevich:
 
     tipos: um nome de TIPOS por neurônio. escala: corrente por unidade de entrada do LIF, por neurônio.
     tau_ampa, tau_gaba: ms, um valor ou um por neurônio.
+    gasto: corrente que cada pulso tira da corrente sináptica (um valor ou um por neurônio; 0 = nada). Com
+    gasto = um limiar do LIF em unidades de corrente (reobase × ganho) e τ sináptico = τ_m, a corrente faz o que
+    a tensão do LIF faz no reset (v − 1): a carga gasta no disparo some, o excesso fica. O Izhikevich decide
+    então quando e como dispara (u, rajadas). Sem gasto, a corrente lenta continua acima da reobase depois do
+    pulso e o neurônio dispara em trem enquanto ela durar.
     """
     modelo = "izhikevich"
 
-    def __init__(self, tipos, escala, tau_ampa=TAU_AMPA, tau_gaba=TAU_GABA):
+    def __init__(self, tipos, escala, tau_ampa=TAU_AMPA, tau_gaba=TAU_GABA, gasto=0.0):
         tipos = list(tipos)
         self.n = len(tipos)
         desconhecidos = sorted(set(tipos) - set(TIPOS))
@@ -146,6 +151,7 @@ class Izhikevich:
         self.escala = self._por_neuronio(escala)
         self.tau_ampa = self._por_neuronio(tau_ampa)
         self.tau_gaba = self._por_neuronio(tau_gaba)
+        self.gasto = self._por_neuronio(gasto)
         if (self.tau_ampa <= 0).any() or (self.tau_gaba <= 0).any():
             raise ValueError("τ sináptico precisa ser positivo")
         self.v = np.array([repouso(t) for t in tipos], dtype=float)  # parte do repouso: sem pulso de partida
@@ -190,4 +196,5 @@ class Izhikevich:
         disparou = v >= PICO
         v[disparou] = self.c[disparou]
         u[disparou] += self.d[disparou]
+        self.i_ampa[disparou] -= self.gasto[disparou]
         return disparou

@@ -6,6 +6,8 @@ NE-1 (plano, onda 2): custo e atividade do BioBrain com populações em Izhikevi
     python ferramentas/comparar_izhikevich.py --so atividade --config todas_membrana
     python ferramentas/comparar_izhikevich.py --calibrar ne2  # QUIET e INHIB contra o LIF, com entrada forte
     python ferramentas/comparar_izhikevich.py --portao ne2    # portão A (20 sementes) com a chave da NE-2 ligada
+    python ferramentas/comparar_izhikevich.py --ajustar ne3   # ganhos da NE-3 por bisseção contra o LIF
+    python ferramentas/comparar_izhikevich.py --portao ne3    # portão A com as chaves da NE-2 e da NE-3 ligadas
 
 Configurações (nenhuma é o padrão do app: o padrão do BioBrain segue sem população em Izhikevich):
 
@@ -38,6 +40,7 @@ for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_var, "1")
 
 import argparse  # noqa: E402
+import math  # noqa: E402
 import multiprocessing  # noqa: E402
 import statistics  # noqa: E402
 import sys  # noqa: E402
@@ -51,7 +54,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pestinha import ajustes  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
 from pestinha.core.bio import BioBrain  # noqa: E402
-from pestinha.core.bio.rede import neuronios_das_chaves  # noqa: E402
+from pestinha.core.bio.rede import EXCITATORIOS_NE3, gasto_das_chaves, neuronios_das_chaves  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import simular_noites  # noqa: E402
 
 RODADAS = 7
 ESTIMULO = {"WORK": 0.8, "TYPING": 0.3}
@@ -78,7 +84,10 @@ CONFIGS = {
 }
 
 
-CHAVES = {"ne2": ("NE_INIBIDORES_FS",)}
+CHAVES = {
+    "ne2": ("NE_INIBIDORES_FS",),
+    "ne3": ("NE_INIBIDORES_FS", "NE_EXCITATORIOS"),
+}
 
 
 def _com_chaves(frente):
@@ -88,13 +97,15 @@ def _com_chaves(frente):
         for k in CHAVES[frente]:
             setattr(ajustes, k, True)
         tipos, ganho, tau = neuronios_das_chaves()
+        gasta = gasto_das_chaves()
     finally:
         for k, v in antes.items():
             setattr(ajustes, k, v)
-    return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau}
+    return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau, "gasta_corrente": gasta}
 
 
 CONFIGS["chaves_ne2"] = _com_chaves("ne2")
+CONFIGS["chaves_ne3"] = _com_chaves("ne3")
 
 
 def cerebro(config, seed_ruido=42):
@@ -140,6 +151,69 @@ def calibrar(frente, sementes=(3, 7, 11, 13, 17)):
         for rotulo, taxas in linhas:
             print(f"| {rotulo} | " + " | ".join(f"{x:.1f}" for x in taxas[nivel]) + " |")
         print()
+
+
+AJUSTAR = {"ne3": EXCITATORIOS_NE3}
+# Os contextos da simulação de noites, mais a dispensa, o carinho e o susto (onde a ALERT dispara).
+CONTEXTOS_AJUSTE = [(nome, sentidos) for nome, sentidos, _ in simular_noites.CONTEXTOS] + [
+    ("DISPENSA", {"DISMISS": 1.0, "BOREDOM": 0.5}),
+    ("CARINHO", {"CARESS": 1.0}),
+    ("SUSTO", {"MOTION": 1.0, "IMPACT": 0.5}),
+]
+
+
+def _taxas_por_contexto(nomes, sementes, **kwargs):
+    """Hz de cada população em cada contexto (0,3 s de aquecimento, 1,5 s medidos), média das sementes."""
+    taxas = np.zeros((len(CONTEXTOS_AJUSTE), len(nomes)))
+    for i, (_nome, sentidos) in enumerate(CONTEXTOS_AJUSTE):
+        for semente in sementes:
+            b = BioBrain(seed=semente, seed_ruido=simular_noites.MEDIDA_SEMENTE, **kwargs)
+            b.stimulate(sentidos)
+            for _ in range(3):
+                b.step(100)
+            b.disparos[:] = 0
+            for _ in range(15):
+                b.step(100)
+            taxa = b.disparos / (1.5 * b.pool_sizes)
+            taxas[i] += [taxa[b._pool_index[n]] for n in nomes]
+    return taxas / len(sementes)
+
+
+def ajustar(frente, sementes=(3, 7, 11), rodadas=10):
+    """
+    Ganho de cada população da frente por bisseção (em escala log, entre 0,05 e 2): a taxa somada nos contextos
+    de CONTEXTOS_AJUSTE fica igual à do LIF. Todas as populações andam juntas a cada rodada, porque uma muda a
+    entrada da outra. Imprime as linhas para ajustes.py e a tabela final por contexto.
+    """
+    nomes = list(AJUSTAR[frente])
+    base = _com_chaves(frente)
+    lif = _taxas_por_contexto(nomes, sementes, tipos={})
+    baixo = {n: 0.05 for n in nomes}
+    alto = {n: 2.0 for n in nomes}
+    ganho = {n: math.sqrt(baixo[n] * alto[n]) for n in nomes}
+    for rodada in range(rodadas):
+        izh = _taxas_por_contexto(nomes, sementes, tipos=base["tipos"], tau_sinaptico=base["tau_sinaptico"],
+                                  gasta_corrente=base["gasta_corrente"], ganho={**base["ganho"], **ganho})
+        razoes = []
+        for j, n in enumerate(nomes):
+            alvo, atual = lif[:, j].sum(), izh[:, j].sum()
+            if alvo < 0.5:                                 # sem atividade no LIF: não há o que igualar
+                continue
+            razoes.append(f"{n} {atual / alvo:.2f}")
+            if atual > alvo:
+                alto[n] = ganho[n]
+            else:
+                baixo[n] = ganho[n]
+            ganho[n] = math.sqrt(baixo[n] * alto[n])
+        print(f"rodada {rodada + 1}: Bio/LIF " + ", ".join(razoes))
+    print("\nPara ajustes.py:\n")
+    for n in nomes:
+        print(f"NE_GANHO_{n} = {ganho[n]:.3f}")
+    print(f"\nHz por contexto, LIF / Izhikevich (o ganho da última linha de cada população é o da rodada {rodadas})\n")
+    print("| população | " + " | ".join(nome for nome, _ in CONTEXTOS_AJUSTE) + " |")
+    print("|---|" + "---|" * len(CONTEXTOS_AJUSTE))
+    for j, n in enumerate(nomes):
+        print(f"| {n} | " + " | ".join(f"{lif[i, j]:.1f} / {izh[i, j]:.1f}" for i in range(len(CONTEXTOS_AJUSTE))) + " |")
 
 
 def portao(frente, extra=()):
@@ -205,6 +279,7 @@ def main(argv=None):
     parser.add_argument("--rodadas", type=int, default=RODADAS)
     parser.add_argument("--calibrar", choices=sorted(CALIBRAR), help="só a calibração da frente")
     parser.add_argument("--portao", choices=sorted(CHAVES), help="só o portão A com as chaves da frente ligadas")
+    parser.add_argument("--ajustar", choices=sorted(AJUSTAR), help="só o ajuste dos ganhos da frente, por bisseção")
     args, extra = parser.parse_known_args(argv)
     if args.portao:
         return portao(args.portao, extra)
@@ -212,6 +287,8 @@ def main(argv=None):
         parser.error(f"argumentos desconhecidos: {' '.join(extra)}")
     if args.calibrar:
         return calibrar(args.calibrar)
+    if args.ajustar:
+        return ajustar(args.ajustar)
     configs = args.config or list(CONFIGS)
 
     if args.so != "atividade":

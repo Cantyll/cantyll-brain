@@ -134,6 +134,19 @@ GANHO_PAPEL = 0.05              # bolinhas de papel por segundo, por Hz do motor
 NE_INIBIDORES_FS = False        # NE-2: QUIET e INHIB em Izhikevich FS (R7: desligado por padrão)
 NE_GANHO_QUIET = 1.0            # medido (comparar_izhikevich.py --calibrar): com 1,0 a QUIET dá 2,3 Hz contra 2,4 do LIF
 NE_GANHO_INHIB = 1.2            # medido (idem): com 1,0 a INHIB dá 24 Hz contra 37 do LIF; com 1,2, 35
+NE_EXCITATORIOS = False         # NE-3: os 8 interneurônios excitatórios em Izhikevich RS (R7: desligado por padrão).
+#                                 Neles o pulso gasta um limiar do LIF da corrente sináptica (gasta_corrente), como o
+#                                 reset do LIF: sem isso a corrente lenta (τ de 60 a 400 ms) sustenta trens de disparo.
+# Ganhos da NE-3, ajustados por bisseção para a taxa somada em 9 contextos (sementes 3, 7 e 11) ficar igual à do LIF
+# (±2% na 10ª rodada): python ferramentas/comparar_izhikevich.py --ajustar ne3. Valem com a NE-2 ligada.
+NE_GANHO_ALERT = 1.591
+NE_GANHO_FOCUS = 1.025
+NE_GANHO_CURIOUS = 1.04
+NE_GANHO_PLAYFUL = 1.014
+NE_GANHO_CALM = 0.92
+NE_GANHO_TIRED = 0.957
+NE_GANHO_FRUSTRATION = 1.04
+NE_GANHO_GLOOM = 0.894
 # <<< decisões
 
 # ---------------------------------------------------------------------------
@@ -323,6 +336,14 @@ _LIMITES = {
     "GANHO_PAPEL": (float, 0.0, 1.0),
     "NE_GANHO_QUIET": (float, 0.1, 10.0),
     "NE_GANHO_INHIB": (float, 0.1, 10.0),
+    "NE_GANHO_ALERT": (float, 0.05, 10.0),
+    "NE_GANHO_FOCUS": (float, 0.05, 10.0),
+    "NE_GANHO_CURIOUS": (float, 0.05, 10.0),
+    "NE_GANHO_PLAYFUL": (float, 0.05, 10.0),
+    "NE_GANHO_CALM": (float, 0.05, 10.0),
+    "NE_GANHO_TIRED": (float, 0.05, 10.0),
+    "NE_GANHO_FRUSTRATION": (float, 0.05, 10.0),
+    "NE_GANHO_GLOOM": (float, 0.05, 10.0),
     # <<< decisões
     "LADO_JANELA_PET": (int, 100, 1000),
     "ZZZ_QUANTIDADE": (int, 0, 20),
