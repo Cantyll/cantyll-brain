@@ -241,16 +241,17 @@ def test_conta_sonos_na_cama_e_fora_e_guarda(app_com_lar):
     app.sleep.fall_asleep()
     assert not lar.cama.ocupada
     app.sleep.wake(startled=False)
-    assert lar.estado() == {"sonos_na_cama": 1, "sonos_fora": 1}
+    assert lar.estado() == {"sonos_na_cama": 1, "sonos_fora": 1, "travessuras_de_casa": 0}
     app.save()
     pasta = app.pet_paths.modulo("lar")
     assert (pasta / ARQUIVO).exists()
     outro = LarModulo(app, cama=lar.cama)
     outro.carregar(pasta)
-    assert outro.estado() == {"sonos_na_cama": 1, "sonos_fora": 1}
+    assert outro.estado() == {"sonos_na_cama": 1, "sonos_fora": 1, "travessuras_de_casa": 0}
 
 
-@pytest.mark.parametrize("conteudo", ['{"sonos_na_cama": -1, "sonos_fora": true}', '[1, 2]', 'lixo'])
+@pytest.mark.parametrize("conteudo", ['{"sonos_na_cama": -1, "sonos_fora": true, "travessuras_de_casa": 1.5}',
+                                      '[1, 2]', 'lixo'])
 def test_arquivo_ruim_comeca_do_zero(app_com_lar, conteudo):
     from pestinha.mind.lar_ctl import LarModulo
     app = app_com_lar
@@ -259,4 +260,4 @@ def test_arquivo_ruim_comeca_do_zero(app_com_lar, conteudo):
     (pasta / ARQUIVO).write_text(conteudo, encoding="utf-8")
     outro = LarModulo(app, cama=_lar(app).cama)
     outro.carregar(pasta)
-    assert outro.estado() == {"sonos_na_cama": 0, "sonos_fora": 0}
+    assert outro.estado() == {"sonos_na_cama": 0, "sonos_fora": 0, "travessuras_de_casa": 0}

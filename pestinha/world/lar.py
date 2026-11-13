@@ -1,5 +1,6 @@
 """
-LAR - o canto do pet na tela: por enquanto, a cama (frente lar, LAR-1).
+LAR - o canto do pet na tela: por enquanto, a cama (frente lar, LAR-1). Na travessura de casa ele
+pula nela e a deixa bagunçada (travesseiro no chão, cobertor embolado) até ir dormir.
 
 A cama fica no chão, no canto inferior esquerdo da tela principal no primeiro uso (o notebook
 fica no direito). Dá para arrastar com o botão esquerdo: ao soltar, ela desce até o chão da tela
@@ -62,6 +63,7 @@ class Cama(FloatingWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.move(*no_chao(self.x(), self.y(), tamanho, _telas_uteis()))
         self.ocupada = False            # ele está deitado nela (só muda o desenho do cobertor)
+        self.baguncada = False          # depois de uma travessura de casa, até ele ir dormir
 
     def centro_x(self):
         """x do meio da cama, onde ele deita."""
@@ -71,6 +73,12 @@ class Cama(FloatingWidget):
         """Puxa o cobertor quando ele deita, e redesenha só se mudou."""
         if ocupada != self.ocupada:
             self.ocupada = ocupada
+            self.update()
+
+    def set_baguncada(self, baguncada):
+        """Travesseiro no chão e cobertor torto (travessura de casa), ou a cama arrumada."""
+        if baguncada != self.baguncada:
+            self.baguncada = baguncada
             self.update()
 
     def mouseReleaseEvent(self, event):
@@ -94,10 +102,16 @@ class Cama(FloatingWidget):
         p.setPen(QPen(QColor("#c9c1b0"), 1.0))
         p.drawRoundedRect(QRectF(12, h - 22, w - 16, 12), 5, 5)          # colchão
         p.setBrush(QColor("#ffffff"))
-        p.drawRoundedRect(QRectF(15, h - 30, 30, 12), 6, 6)              # travesseiro
+        if self.baguncada:
+            p.drawRoundedRect(QRectF(w - 34, h - 11, 30, 10), 5, 5)       # travesseiro caído no pé da cama
+        else:
+            p.drawRoundedRect(QRectF(15, h - 30, 30, 12), 6, 6)          # travesseiro
         inicio = w * (0.34 if self.ocupada else 0.55)                     # deitado: cobertor puxado
         cobertor = QPainterPath()
-        cobertor.addRoundedRect(QRectF(inicio, h - 25, w - inicio - 4, 15), 6, 6)
+        if self.baguncada:
+            cobertor.addRoundedRect(QRectF(w * 0.2, h - 31, w * 0.45, 20), 9, 9)   # embolado no meio
+        else:
+            cobertor.addRoundedRect(QRectF(inicio, h - 25, w - inicio - 4, 15), 6, 6)
         p.setBrush(QColor("#6b8fd6"))
         p.setPen(QPen(QColor("#4a6db3"), 1.0))
         p.drawPath(cobertor)

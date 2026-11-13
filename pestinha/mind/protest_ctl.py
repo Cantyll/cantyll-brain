@@ -28,6 +28,7 @@ class ProtestController:
         self.state = state          # PetState: protest_stage é espelhado aqui
         self.debug = debug
         self.visivel = True         # o cartaz novo nasce com a visibilidade da sessão
+        self.dispensa_e_atencao = True  # False com o lar ligado: arrancar o cartaz não diminui a carência
 
     @property
     def stage(self):
@@ -79,7 +80,8 @@ class ProtestController:
             return                                  # cartaz de fim, ou tristeza: só fecha, não reprime
         self.protest.repressed()
         self.senses.dismissed()
-        self.drives.touched("dismiss")
+        if self.dispensa_e_atencao:                 # com o lar ligado, arrancar o cartaz não conta como atenção
+            self.drives.touched("dismiss")
         self.protest.respawn_at = time.monotonic() + 3.0
         if self.debug():
             log(f"[protesto] cartaz arrancado! insatisfação {self.protest.grievance:.2f}")

@@ -182,6 +182,8 @@ LAR_MARGEM_C = 0.1              # e o relógio a esta distância do limiar da no
 LAR_VELOCIDADE_CAMA = 90.0      # px/s: com sono, ele vai devagar até a cama
 LAR_CHEGOU_CAMA = 14            # px do centro da cama: já está deitado nela
 LAR_VALIDADE_CAMA = 1.0         # s: o pedido de ir para a cama vale isso; sem o módulo renovar, ele esquece
+LAR_DURACAO_BAGUNCA = 8.0       # s: uma travessura de casa (pular na cama e bagunçar o canto)
+LAR_PULOS_BAGUNCA = 1.5         # pulinhos por segundo enquanto bagunça a cama
 # <<< frente lar
 # >>> frente modelo_eu (dono: EU-1, EU-2)
 # <<< frente modelo_eu
@@ -297,6 +299,8 @@ _LIMITES = {
     "LAR_VELOCIDADE_CAMA": (float, 10.0, 1000.0),
     "LAR_CHEGOU_CAMA": (int, 1, 200),
     "LAR_VALIDADE_CAMA": (float, 0.1, 10.0),
+    "LAR_DURACAO_BAGUNCA": (float, 0.5, 120.0),
+    "LAR_PULOS_BAGUNCA": (float, 0.0, 10.0),
     # <<< frente lar
     # >>> frente modelo_eu
     # <<< frente modelo_eu
