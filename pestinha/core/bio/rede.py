@@ -36,8 +36,9 @@ from ...store import read_json, write_json
 from .. import nervous_system as ns
 from ..homeostase_sinaptica import downscaling, saturacao
 from ..nervous_system import Brain, LEARN_MAX, LEARN_MIN, LEARN_RATE_PADRAO
-from .neuronios import TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, Neuronio, escala_de_corrente
+from .neuronios import Neuronio
 from .projecoes import compilar, projecao_de_bloco
+from .neuronios import TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, escala_de_corrente  # NE-1
 
 BIO_VERSION = 1
 
@@ -209,6 +210,35 @@ class BioBrain(Brain):
         self.raster = deque(maxlen=ns.RASTER_BINS)
         self._bin = np.zeros(self.N, dtype=bool)
 
+    # ---------------- populações ----------------
+
+    def pool(self, name):
+        """A população pelo nome."""
+        return self.pools[self._pool_index[name]]
+
+    @property
+    def W(self):
+        """Matriz densa (N × N) das sinapses, montada na hora. Só para ferramentas que contam ou conferem pesos."""
+        matriz = np.zeros((self.N, self.N))
+        matriz[:, self.Ns:] = self.sinapses.densa()
+        return matriz
+
+    # ---------------- interface ----------------
+
+    def definir_ausencia(self, ausente):
+        """R1: com o usuário ausente, FUGIR e TRAVESSURA recebem corrente inibitória (AUSENCIA_CORRENTE)."""
+        self.ausente = bool(ausente)
+
+    def stimulate(self, intensities):
+        """Intensidade (0 a 1) de cada canal sensorial vira probabilidade de disparo dos receptores."""
+        self.s_prob[:] = 0.0
+        for k, name in enumerate(self.sensory_names):
+            level = float(intensities.get(name, 0.0))
+            level = 0.0 if level < 0 else 1.0 if level > 1 else level
+            self._levels[k] = level
+            sl = self.pool(name).fatia
+            self.s_prob[sl] = self.s_rate[sl] * level * 0.001
+
     def _montar_neuronios(self, tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico):
         """
         Divide os neurônios não sensoriais em dois grupos: LIF (`self.neuronios`) e Izhikevich
@@ -252,35 +282,6 @@ class BioBrain(Brain):
         # corrente de ausência (R1) nos índices de cada grupo
         self._ausencia_lif = np.flatnonzero(np.isin(locais_lif, self._idx_ausencia))
         self._ausencia_izh = np.flatnonzero(np.isin(locais_izh, self._idx_ausencia))
-
-    # ---------------- populações ----------------
-
-    def pool(self, name):
-        """A população pelo nome."""
-        return self.pools[self._pool_index[name]]
-
-    @property
-    def W(self):
-        """Matriz densa (N × N) das sinapses, montada na hora. Só para ferramentas que contam ou conferem pesos."""
-        matriz = np.zeros((self.N, self.N))
-        matriz[:, self.Ns:] = self.sinapses.densa()
-        return matriz
-
-    # ---------------- interface ----------------
-
-    def definir_ausencia(self, ausente):
-        """R1: com o usuário ausente, FUGIR e TRAVESSURA recebem corrente inibitória (AUSENCIA_CORRENTE)."""
-        self.ausente = bool(ausente)
-
-    def stimulate(self, intensities):
-        """Intensidade (0 a 1) de cada canal sensorial vira probabilidade de disparo dos receptores."""
-        self.s_prob[:] = 0.0
-        for k, name in enumerate(self.sensory_names):
-            level = float(intensities.get(name, 0.0))
-            level = 0.0 if level < 0 else 1.0 if level > 1 else level
-            self._levels[k] = level
-            sl = self.pool(name).fatia
-            self.s_prob[sl] = self.s_rate[sl] * level * 0.001
 
     def _substep(self):
         """Um passo de 1 ms: propaga os pulsos do passo anterior pelas sinapses, integra, dispara e habitua."""
