@@ -11,6 +11,7 @@ Estados de missão (entregar meme, atravessar a tela) passam na frente do
 passeio normal; cair, ser segurado ou estar tombado passam na frente de tudo.
 Com sono chegando, o lar (mind/lar_ctl.py, frente desligada por padrão) pede que ele vá
 para a cama: o pedido passa na frente da bolinha e do passeio, e atrás de missão e protesto.
+Na travessura de casa, o pedido é o mesmo, mas lá ele pula na cama em vez de deitar.
 """
 
 import math
@@ -58,7 +59,7 @@ class Behavior:
         self.march_dir = 1
         self.next_glance = 0.0
         self.screen_areas = []      # áreas de todos os monitores, atualizadas pelo app
-        self.cama = None            # (x da cama, válido até): o lar pede que ele vá deitar (None: não pede)
+        self.cama = None            # (x da cama, válido até[, "deitar" | "bagunca"]): o lar pede que ele vá à cama
 
     def look_at(self, x, y, now):
         """Olha para um ponto da tela por alguns segundos."""
@@ -243,7 +244,11 @@ class Behavior:
         if self.cama is not None and now > self.cama[1]:
             self.cama = None
         if self.cama is not None and self.emotion not in STILL and self._alcanca(self.cama[0], left, right):
-            self._ir_para_cama(self.cama[0], platforms, left, right)
+            chegou = self._ir_para_cama(self.cama[0], platforms, left, right)
+            if chegou and len(self.cama) > 2 and self.cama[2] == "bagunca" \
+                    and random.random() < ajustes.LAR_PULOS_BAGUNCA * dt:
+                spin = random.choice((-1, 1)) * 360.0 if random.random() < 0.3 else 0.0
+                body.jump(random.uniform(-40.0, 40.0), -random.uniform(220.0, 320.0), spin)
             return
 
         # brincar com a bolinha (chutar ou arremessar, conforme o estilo do pet)

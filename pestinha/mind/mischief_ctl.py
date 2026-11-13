@@ -6,6 +6,13 @@ triste e dormindo não aprontam). A memória episódica escolhe o que FAZER,
 pelo que deu certo antes naquele contexto. A dispensa alimenta a rede (raiva),
 a memória (episódio negativo) e o aprendizado (penalidade de 1 s). Dispensas repetidas no
 mesmo dia pesam cada vez menos no aprendizado (core/habituacao.py); a raiva e a memória, não.
+
+Com o lar ligado (mind/lar_ctl.py, frente desligada por padrão; opção A do lazer no lar):
+    - a travessura que vem do tédio, em paz, vira travessura de casa: ele bagunça o próprio canto
+      em vez de levar coisa para a sua tela. O pedido do menu ("fazer uma travessura agora"), o
+      protesto e as caras de triste e de bravo continuam na tela, como antes;
+    - a dispensa deixa de contar como atenção (não diminui a carência). A raiva, o episódio e a
+      penalidade de aprendizado continuam iguais.
 """
 
 from ..log import log
@@ -13,6 +20,7 @@ import random
 from collections import deque
 
 VALIDADE_PEDIDO_S = 10.0    # s: "fazer uma travessura agora" vale por este tempo
+EMOCOES_DA_TELA = ("triste", "bravo", "dormindo")   # com o lar ligado, estas continuam na sua tela (decisão de escopo à parte)
 
 from .. import ajustes
 from ..core.emotion import PRIORITY
@@ -41,6 +49,8 @@ class MischiefController:
         self._acariciando = False
         self.pedido_forcado = False     # "fazer uma travessura agora": ignora o sorteio uma vez
         self.forcado_ate = 0.0
+        self.travessura_de_casa = None  # função now -> bool, ligada pelo lar: a travessura do tédio vai para o canto dele
+        self.dispensa_e_atencao = True  # False com o lar: dispensar não diminui a carência
 
     def pedir(self, now):
         """O comando do menu: a próxima tentativa acontece, se as regras permitirem, nos próximos segundos."""
@@ -63,7 +73,15 @@ class MischiefController:
             return None
         if body.held or not body.grounded or self.behavior.mission:
             return None
-        if asleep or protest_stage == 3 or not self.engine.allowed(perms, prof, fullscreen):   # greve para tudo; reclamação/manifestação não param os post-its
+        if asleep:
+            return None
+        if (self.travessura_de_casa is not None and not self.pedido_forcado and protest_stage == 0
+                and emotion not in EMOCOES_DA_TELA):
+            if not self.travessura_de_casa(now):     # o lar não pôde agora (pet escondido): nada, nem na tela
+                return None
+            self.drives.stimulate("mischief")        # bagunçar a casa também tira o tédio
+            return "casa"
+        if protest_stage == 3 or not self.engine.allowed(perms, prof, fullscreen):   # greve para tudo; reclamação/manifestação não param os post-its
             return None
 
         ctx = self.memory.context(activity, emotion)
@@ -106,7 +124,8 @@ class MischiefController:
     def on_dismissed(self, thing, elapsed, prof, now):
         """Você dispensou uma travessura: vira frustração e entra na memória como aprendizado."""
         self.senses.dismissed()
-        self.drives.touched("dismiss")
+        if self.dispensa_e_atencao:
+            self.drives.touched("dismiss")
         self.memory.on_dismiss(thing, elapsed, prof["dismiss_patience"])
         self.penalty_until = now + PENALTY_SECONDS
         self.peso_penalidade = self.habituacao.registrar(now)
