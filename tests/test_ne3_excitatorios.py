@@ -1,6 +1,7 @@
 """
 NE-3 (plano, onda 2): os 8 interneurônios excitatórios do BioBrain (ALERT, FOCUS, CURIOUS, PLAYFUL, CALM, TIRED,
-FRUSTRATION, GLOOM) em Izhikevich RS, atrás da chave ajustes.NE_EXCITATORIOS, desligada por padrão (R7).
+FRUSTRATION, GLOOM) em Izhikevich, atrás da chave ajustes.NE_EXCITATORIOS, desligada por padrão (R7). Sete em RS;
+a ALERT em CH, com a adaptação lenta do LIF (tests/test_ne_susto.py).
 
 Com a chave ligada, as 8 populações usam τ sináptico = τ_m do LIF (opção A, 2026-11-13), os ganhos de ajustes.py,
 e o pulso gasta um limiar do LIF da corrente sináptica (gasta_corrente), como o reset do LIF. Os critérios são
@@ -32,9 +33,10 @@ def test_chave_desligada_por_padrao():
     assert all(name not in neuronios_das_chaves()[0] for name in EXCITATORIOS_NE3)
 
 
-def test_chave_ligada_poe_os_8_excitatorios_em_rs(ne3):
+def test_chave_ligada_poe_7_excitatorios_em_rs_e_a_alert_em_ch(ne3):
     tipos, ganho, tau = neuronios_das_chaves()
-    assert {name: tipos[name] for name in EXCITATORIOS_NE3} == {name: "RS" for name in EXCITATORIOS_NE3}
+    esperado = {name: "RS" for name in EXCITATORIOS_NE3} | {"ALERT": "CH"}
+    assert {name: tipos[name] for name in EXCITATORIOS_NE3} == esperado
     assert tipos["QUIET"] == tipos["INHIB"] == "FS"
     assert set(tau.values()) == {"membrana"}
     assert all(ganho[name] == getattr(ajustes, f"NE_GANHO_{name}") for name in EXCITATORIOS_NE3)
@@ -52,7 +54,7 @@ def test_gasto_e_um_limiar_do_lif_so_nos_excitatorios(ne3):
         sl = b.pool(name).fatia
         m = (b._locais_izh + Ns >= sl.start) & (b._locais_izh + Ns < sl.stop)
         if name in EXCITATORIOS_NE3:
-            esperado = reobase("RS") * getattr(ajustes, f"NE_GANHO_{name}")
+            esperado = reobase(b.tipos[name]) * getattr(ajustes, f"NE_GANHO_{name}")
             assert np.allclose(izh.gasto[m], esperado), name
         else:
             assert np.all(izh.gasto[m] == 0.0), name

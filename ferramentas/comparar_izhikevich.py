@@ -57,7 +57,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pestinha import ajustes  # noqa: E402
 from pestinha.core import nervous_system as ns  # noqa: E402
 from pestinha.core.bio import BioBrain, acelerado  # noqa: E402
-from pestinha.core.bio.rede import EXCITATORIOS_NE3, MOTORES_NE4, gasto_das_chaves, neuronios_das_chaves  # noqa: E402
+from pestinha.core.bio.rede import (  # noqa: E402
+    EXCITATORIOS_NE3, MOTORES_NE4, adaptacao_das_chaves, gasto_das_chaves, neuronios_das_chaves)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import simular_noites  # noqa: E402
@@ -102,10 +103,11 @@ def _com_chaves(frente):
             setattr(ajustes, k, True)
         tipos, ganho, tau = neuronios_das_chaves()
         gasta = gasto_das_chaves()
+        lenta = adaptacao_das_chaves()
     finally:
         for k, v in antes.items():
             setattr(ajustes, k, v)
-    return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau, "gasta_corrente": gasta}
+    return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau, "gasta_corrente": gasta, "adaptacao_lenta": lenta}
 
 
 CONFIGS["chaves_ne2"] = _com_chaves("ne2")
@@ -176,8 +178,9 @@ CANAIS_DOS_MOTORES = ("MOTION", "NOVELTY", "SILENCE", "WORK", "PLAY", "SOUND", "
                       "LONELY", "CARESS", "ANTICIPATE", "TOY_NEAR", "TOY_TAKEN", "THROW", "IMPACT", "BOREDOM", "PEDIDO",
                       "PRESO", "LEMBRA_FUGA", "RECUSA", "ANTECIPA_PLACA", "VISITA", "RECEIO", "RANCOR")
 CONTEXTOS_NE4 = CONTEXTOS_AJUSTE + [(f"{c} {n:.1f}", {c: n}) for c in CANAIS_DOS_MOTORES for n in (1.0, 0.5)]
-# O STARTLE fica fora da bisseção da NE-4: o ganho dele sai do reflexo de susto (--comportamento ne4).
-AJUSTAR = {"ne3": (EXCITATORIOS_NE3, CONTEXTOS_AJUSTE),
+# A ALERT (NE-3) e o STARTLE (NE-4) ficam fora da bisseção: os ganhos deles saem do reflexo de susto
+# (--comportamento ne4 e tests/test_ne_susto.py), que a taxa somada não vê.
+AJUSTAR = {"ne3": (tuple(m for m in EXCITATORIOS_NE3 if m != "ALERT"), CONTEXTOS_AJUSTE),
            "ne4": (tuple(m for m in MOTORES_NE4 if m != "STARTLE"), CONTEXTOS_NE4)}
 
 
@@ -213,7 +216,8 @@ def ajustar(frente, sementes=(3, 7, 11), rodadas=10):
     ganho = {n: math.sqrt(baixo[n] * alto[n]) for n in nomes}
     for rodada in range(rodadas):
         izh = _taxas_por_contexto(nomes, sementes, contextos, tipos=base["tipos"], tau_sinaptico=base["tau_sinaptico"],
-                                  gasta_corrente=base["gasta_corrente"], ganho={**base["ganho"], **ganho})
+                                  gasta_corrente=base["gasta_corrente"], adaptacao_lenta=base["adaptacao_lenta"],
+                                  ganho={**base["ganho"], **ganho})
         razoes = []
         for j, n in enumerate(nomes):
             alvo, atual = lif[:, j].sum(), izh[:, j].sum()
@@ -250,28 +254,44 @@ CASOS_SUSTO = [
 
 
 def sustos(sentidos, dur_ms, sementes=range(1, 21), **kwargs):
-    """(sementes com susto, pico médio do STARTLE em Hz) para um estímulo de dur_ms, lido a cada 33 ms por 3 s."""
+    """
+    (sementes com susto, pico médio do STARTLE em Hz) para um estímulo de dur_ms depois de 0,66 s de repouso, lido
+    a cada 33 ms até 1,2 s depois do fim do estímulo (o reflexo sobe e desce nesse tempo). Susto = o pico passa de
+    Emotion.STARTLE_HZ.
+    """
     from pestinha.core.emotion import STARTLE_HZ
     n, picos = 0, []
     for semente in sementes:
         b = BioBrain(seed=semente, seed_ruido=semente + 100, **kwargs)
         b.stimulate({"SILENCE": 0.2})
-        for _ in range(30):
+        for _ in range(20):
             b.step(33)
         b.stimulate(sentidos)
-        i, armado, pico = b._pool_index["STARTLE"], True, 0.0
-        for k in range(3000 // 33):
+        i, pico = b._pool_index["STARTLE"], 0.0
+        for k in range((dur_ms + 1200) // 33):
             if k * 33 >= dur_ms:
                 b.stimulate({"SILENCE": 0.2})
             b.step(33)
-            r = b.pool_rate[i]
-            pico = max(pico, r)
-            if r >= STARTLE_HZ and armado:
-                n, armado = n + 1, False
-            elif r < 0.3 * STARTLE_HZ:
-                armado = True
+            pico = max(pico, b.pool_rate[i])
+        n += pico >= STARTLE_HZ
         picos.append(pico)
-    return n, float(np.mean(picos))
+    return int(n), float(np.mean(picos))
+
+
+def comparar_sustos(sementes, frente="ne4"):
+    """
+    Cada caso de CASOS_SUSTO no LIF e na frente: (nome, sustos LIF, sustos frente, picos, z, passou). z é a
+    diferença das proporções em erros-padrão (piso de variância 0,025, para os casos em 0 ou em todas); passa com
+    |z| ≤ 2, o critério do portão A.
+    """
+    n = len(sementes)
+    linhas = []
+    for nome, sentidos, dur in CASOS_SUSTO:
+        (nl, pl), (nz, pz) = sustos(sentidos, dur, sementes, tipos={}), sustos(sentidos, dur, sementes, **_com_chaves(frente))
+        a, b = nl / n, nz / n
+        z = (b - a) / math.sqrt(max(a * (1 - a) + b * (1 - b), 0.025) / n)
+        linhas.append((nome, nl, nz, pl, pz, z, abs(z) <= 2.0))
+    return linhas
 
 
 def perfil_de_comportamento(sentidos, sementes=range(1, 11), dur_s=6.0, **kwargs):
@@ -299,12 +319,13 @@ def comportamento(frente):
     """
     lif = {"tipos": {}}
     frente_ = _com_chaves(frente)
-    print(f"Reflexo de susto, LIF / {frente} (sementes com susto em 20; pico médio do STARTLE em Hz)\n")
-    print("| estímulo | sustos | pico Hz |")
-    print("|---|---|---|")
-    for nome, sentidos, dur in CASOS_SUSTO:
-        (nl, pl), (nz, pz) = sustos(sentidos, dur, **lif), sustos(sentidos, dur, **frente_)
-        print(f"| {nome} | {nl} / {nz} | {pl:.1f} / {pz:.1f} |", flush=True)
+    sementes = range(41, 61)
+    print(f"Reflexo de susto, LIF / {frente}: sementes com susto, de {len(sementes)} (41 a 60); pico médio do STARTLE em Hz;"
+          " z = diferença em erros-padrão (passa com |z| ≤ 2)\n")
+    print("| estímulo | sustos | pico Hz | z | passa |")
+    print("|---|---|---|---|---|")
+    for nome, nl, nz, pl, pz, z, ok in comparar_sustos(sementes, frente):
+        print(f"| {nome} | {nl} / {nz} | {pl:.1f} / {pz:.1f} | {z:+.1f} | {'sim' if ok else 'NÃO'} |", flush=True)
     print(f"\nComportamento do MotorDecoder, LIF / {frente} (fração do tempo; os três mais frequentes)\n")
     print("| contexto | LIF | " + frente + " | distância |")
     print("|---|---|---|---|")

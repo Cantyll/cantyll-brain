@@ -13,7 +13,7 @@ import pytest
 from pestinha import ajustes
 from pestinha.core import nervous_system as ns
 from pestinha.core.bio import BioBrain, acelerado
-from pestinha.core.bio.rede import neuronios_das_chaves, gasto_das_chaves
+from pestinha.core.bio.rede import adaptacao_das_chaves, gasto_das_chaves, neuronios_das_chaves
 
 precisa_numba = pytest.mark.skipif(not acelerado.DISPONIVEL, reason=f"sem Numba: {acelerado.MOTIVO}")
 
@@ -25,7 +25,8 @@ def _config(nome, monkeypatch):
     monkeypatch.setattr(ajustes, "NE_EXCITATORIOS", nome in ("ne3", "ne4"))
     monkeypatch.setattr(ajustes, "NE_MOTORES", nome == "ne4")              # NE-4: motores em RS e o STARTLE em CH
     tipos, ganho, tau = neuronios_das_chaves()
-    return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau, "gasta_corrente": gasto_das_chaves()}
+    return {"tipos": tipos, "ganho": ganho, "tau_sinaptico": tau, "gasta_corrente": gasto_das_chaves(),
+            "adaptacao_lenta": adaptacao_das_chaves()}
 
 
 def _par(kwargs, monkeypatch, seed=7, seed_ruido=5):
@@ -42,7 +43,7 @@ def _estado(b):
               b.neuronios.ref.astype(float)]
     if b.izhikevich is not None:
         z = b.izhikevich
-        partes += [z.v, z.u, z.i_ampa, z.i_gaba]
+        partes += [z.v, z.u, z.i_ampa, z.i_gaba, z.adapt]
     return partes
 
 

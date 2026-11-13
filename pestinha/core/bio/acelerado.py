@@ -85,8 +85,11 @@ if DISPONIVEL:
     @_jit
     def izhikevich(locais, exc, inh, normal, sigma, inibido, ausente, inibicao,
                    v, u, i_ampa, i_gaba, decai_ampa, decai_gaba, salto_ampa, salto_gaba,
-                   pa, pb, pc, pd, gasto, pico, disparou):
-        """Izhikevich.passo (sem `externa`) para os neurônios `locais`, escrevendo em `disparou[locais]`."""
+                   pa, pb, pc, pd, gasto, adapta, ad, ad_b, ad_decay, lim, pico, disparou):
+        """
+        Izhikevich.passo (sem `externa`) para os neurônios `locais`, escrevendo em `disparou[locais]`. Com
+        `adapta`, a adaptação lenta (ad, ad_b, ad_decay, lim), na ordem do numpy.
+        """
         for n in range(locais.size):
             g = locais[n]
             entrada_inh = inh[g]
@@ -97,6 +100,8 @@ if DISPONIVEL:
             ig = i_gaba[n] * decai_gaba[n]
             ig = ig + entrada_inh * salto_gaba[n]
             corrente = ia + ig
+            if adapta:
+                corrente = corrente - ad[n] * lim[n]
             x = v[n]
             un = u[n]
             x = x + 0.5 * (0.04 * x * x + 5.0 * x + 140.0 - un + corrente)
@@ -117,6 +122,11 @@ if DISPONIVEL:
             u[n] = un
             i_ampa[n] = ia
             i_gaba[n] = ig
+            if adapta:
+                an = ad[n] * ad_decay[n]
+                if dispara:
+                    an = an + ad_b[n]
+                ad[n] = an
             disparou[g] = dispara
 
     @_jit

@@ -136,10 +136,15 @@ class Izhikevich:
     a tensão do LIF faz no reset (v − 1): a carga gasta no disparo some, o excesso fica. O Izhikevich decide
     então quando e como dispara (u, rajadas). Sem gasto, a corrente lenta continua acima da reobase depois do
     pulso e o neurônio dispara em trem enquanto ela durar.
+    adapt_b, adapt_tau, limiar: a adaptação lenta do LIF (o limiar sobe adapt_b a cada pulso e volta em
+    adapt_tau segundos), levada como corrente: a cada ms, tira-se adaptação × limiar da corrente, com limiar =
+    um limiar do LIF em corrente (escala × (1 − e^(−1/τ_m))). O u do Izhikevich adapta em ~50 ms (RS, CH); esta é
+    a de segundos que o LIF tinha. adapt_b = 0 (padrão): sem adaptação lenta, bit a bit o de antes.
     """
     modelo = "izhikevich"
 
-    def __init__(self, tipos, escala, tau_ampa=TAU_AMPA, tau_gaba=TAU_GABA, gasto=0.0):
+    def __init__(self, tipos, escala, tau_ampa=TAU_AMPA, tau_gaba=TAU_GABA, gasto=0.0, adapt_b=0.0, adapt_tau=1.0,
+                 limiar=0.0):
         tipos = list(tipos)
         self.n = len(tipos)
         desconhecidos = sorted(set(tipos) - set(TIPOS))
@@ -154,6 +159,11 @@ class Izhikevich:
         self.gasto = self._por_neuronio(gasto)
         if (self.tau_ampa <= 0).any() or (self.tau_gaba <= 0).any():
             raise ValueError("τ sináptico precisa ser positivo")
+        self.adapt_b = self._por_neuronio(adapt_b)
+        self.adapt_decay = np.exp(-1.0 / (self._por_neuronio(adapt_tau) * 1000.0))
+        self.limiar = self._por_neuronio(limiar)
+        self.adapt = np.zeros(self.n)
+        self._adapta = bool((self.adapt_b != 0.0).any())
         self.v = np.array([repouso(t) for t in tipos], dtype=float)  # parte do repouso: sem pulso de partida
         self.u = self.b * self.v
         self.i_ampa = np.zeros(self.n)
@@ -184,6 +194,8 @@ class Izhikevich:
         corrente = self.i_ampa + self.i_gaba
         if externa is not None:
             corrente = corrente + externa
+        if self._adapta:
+            corrente = corrente - self.adapt * self.limiar
 
         v, u = self.v, self.u
         v += 0.5 * (0.04 * v * v + 5.0 * v + 140.0 - u + corrente)
@@ -197,4 +209,7 @@ class Izhikevich:
         v[disparou] = self.c[disparou]
         u[disparou] += self.d[disparou]
         self.i_ampa[disparou] -= self.gasto[disparou]
+        if self._adapta:                                     # como no LIF: decai, e o pulso soma adapt_b
+            self.adapt *= self.adapt_decay
+            self.adapt[disparou] += self.adapt_b[disparou]
         return disparou

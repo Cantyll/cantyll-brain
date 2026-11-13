@@ -45,7 +45,8 @@ def test_chave_ligada_poe_14_em_rs_e_o_startle_em_ch(ne4):
     tipos, ganho, tau = neuronios_das_chaves()
     assert {name: tipos[name] for name in MOTORES_NE4} == TIPO_NE4
     assert TIPO_NE4["STARTLE"] == "CH" and {TIPO_NE4[m] for m in MOTORES_NE4 if m != "STARTLE"} == {"RS"}
-    assert {tipos[name] for name in EXCITATORIOS_NE3} == {"RS"} and tipos["QUIET"] == tipos["INHIB"] == "FS"
+    assert {tipos[name] for name in EXCITATORIOS_NE3 if name != "ALERT"} == {"RS"} and tipos["ALERT"] == "CH"
+    assert tipos["QUIET"] == tipos["INHIB"] == "FS"
     assert set(tau.values()) == {"membrana"}
     assert all(ganho[name] == getattr(ajustes, f"NE_GANHO_{name}") for name in MOTORES_NE4)
     assert set(MOTORES_NE4) <= gasto_das_chaves()
@@ -139,11 +140,15 @@ def test_reflexo_de_susto(ne4):
 
 
 def test_em_rs_o_susto_curto_se_perde(ne4):
-    """Por que o STARTLE é CH: em RS, com o ganho que iguala a taxa somada (0,653), o susto curto quase some."""
+    """
+    Por que o STARTLE é CH: em RS, com o ganho que iguala a taxa somada (0,653), a troca de janela curta (MOTION 1,0
+    por 300 ms) quase não assusta (no LIF assusta em todas as sementes). Vale também com a ALERT já em CH.
+    """
     k = ci._com_chaves("ne4")
+    lif, _ = ci.sustos({"MOTION": 1.0}, 300, sementes=range(41, 51), tipos={})
     k = {**k, "tipos": {**k["tipos"], "STARTLE": "RS"}, "ganho": {**k["ganho"], "STARTLE": 0.653}}
-    curto, _ = ci.sustos({"MOTION": 1.0, "IMPACT": 0.5}, 300, sementes=range(1, 11), **k)
-    assert curto <= 5, curto
+    curto, _ = ci.sustos({"MOTION": 1.0}, 300, sementes=range(41, 51), **k)
+    assert lif == 10 and curto <= 5, (lif, curto)
 
 
 @pytest.mark.parametrize("contexto", ["PROGRAMMING", "DISPENSA", "CARINHO", "SUSTO", "PEDIDO 1.0", "LEMBRA_FUGA 1.0"])
