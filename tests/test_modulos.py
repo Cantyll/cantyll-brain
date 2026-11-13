@@ -41,6 +41,11 @@ class Espiao(Modulo):
     def depois_do_passo(self, cerebro, drives, dt):
         self.chamadas.append("depois_do_passo")
 
+    def ajustar_recompensa(self, recompensa, fontes, dt):
+        self.chamadas.append("ajustar_recompensa")
+        self.fontes = fontes
+        return None
+
     def valor_esperado(self):
         self.chamadas.append("valor_esperado")
         return self.v
@@ -139,6 +144,8 @@ def test_registro_vazio_nao_muda_nada(tmp_path):
     saida = registro.sentir(entrada, 0.1)
     assert saida is entrada and saida == {"WORK": 1.0, "TYPING": 0.6}
     assert registro.valor_esperado() is None
+    r = 0.123456789
+    assert registro.ajustar_recompensa(r, {"carinho": r}, 0.1) is r
     assert registro.estado() == {}
     registro.depois_do_passo(None, None, 0.1)
     registro.ao_dormir(None)
@@ -212,9 +219,56 @@ def test_taxas_motoras_iguais_com_o_registro_vazio():
         b.step(100)
         a.learn(0.5 if k % 5 == 0 else 0.0, 0.0, 0.1)
         v = registro.valor_esperado()
-        b.learn(0.5 if k % 5 == 0 else 0.0, 0.0 if v is None else v, 0.1)
+        r = registro.ajustar_recompensa(0.5 if k % 5 == 0 else 0.0, {}, 0.1)
+        b.learn(r, 0.0 if v is None else v, 0.1)
     assert a.motor_activity() == b.motor_activity()
     assert (a.learned == b.learned).all()
+
+
+class Teto(Modulo):
+    """Corta o carinho pela metade; não responde o V."""
+    nome = "lar"
+
+    def ajustar_recompensa(self, recompensa, fontes, dt):
+        fontes["carinho"] = 99.0                    # mexer na cópia não muda nada para os outros
+        return recompensa - 0.5 * fontes.get("dispensa", 0.0)
+
+
+class Dobro(Modulo):
+    nome = "diario"
+
+    def ajustar_recompensa(self, recompensa, fontes, dt):
+        return 2 * recompensa
+
+
+class Ruim(Modulo):
+    nome = "gravador"
+
+    def __init__(self, resposta):
+        self.resposta = resposta
+
+    def ajustar_recompensa(self, recompensa, fontes, dt):
+        if self.resposta == "erro":
+            raise RuntimeError("defeito de propósito")
+        return self.resposta
+
+
+def test_recompensa_passa_pelos_modulos_em_cadeia():
+    registro = RegistroDeModulos()
+    registro.registrar(Teto())
+    registro.registrar(Dobro())
+    fontes = {"dispensa": -0.6}
+    assert registro.ajustar_recompensa(-0.6, fontes, 0.1) == pytest.approx(2 * (-0.6 + 0.3))
+    assert fontes == {"dispensa": -0.6}
+
+
+@pytest.mark.parametrize("resposta", [None, float("nan"), float("inf"), "1.0", True, "erro"])
+def test_resposta_invalida_deixa_a_recompensa_como_estava(resposta):
+    registro = RegistroDeModulos()
+    registro.registrar(Ruim(resposta))
+    registro.registrar(Dobro())
+    assert registro.ajustar_recompensa(0.25, {}, 0.1) == 0.5
+    assert registro.nomes() == (["diario"] if resposta == "erro" else ["gravador", "diario"])
 
 
 # ---------------- no app ----------------
@@ -279,9 +333,10 @@ def test_modulo_recebe_todos_os_encaixes_na_ordem(qapp, tmp_path, monkeypatch):
         app.toggle_pause()
         estado = app.modulos.estado()
         app.save()
-        assert espiao.chamadas == ["carregar", "sentir", "depois_do_passo", "valor_esperado",
+        assert espiao.chamadas == ["carregar", "sentir", "depois_do_passo", "ajustar_recompensa", "valor_esperado",
                                    "ao_dormir", "ao_acordar", "deslocar", "estado", "salvar"]
-        assert estado == {"lar": {"chamadas": 8}}
+        assert estado == {"lar": {"chamadas": 9}}
+        assert "castigo" in espiao.fontes
         assert espiao.pastas == [app.pet_paths.modulo("lar")] * 2
     finally:
         _fechar(app)

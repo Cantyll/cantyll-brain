@@ -453,12 +453,17 @@ class PestinhaApp(SessaoMixin, InteracaoMixin, QObject):
             self.poke_reflex(motor["CHEER"] - self.poke_probe[1])
 
         reward = 0.0
+        fontes = {}                                  # de onde veio cada parte da recompensa (para os módulos)
         if self.perms["carinho"] and not self.protest.stage:     # em protesto, carinho acalma mas não ensina
             if caressing:
                 reward += CARESS_REWARD
+                fontes["carinho"] = CARESS_REWARD
             if self.mischief_ctl.penalty_active(now):
-                reward += DISMISS_PENALTY * self.mischief_ctl.peso_penalidade     # habituação: a repetida pesa menos
-        reward += self.castigo.punicao(now)          # ser preso é recompensa negativa: o castigo ensina
+                fontes["dispensa"] = DISMISS_PENALTY * self.mischief_ctl.peso_penalidade
+                reward += fontes["dispensa"]         # habituação: a repetida pesa menos
+        fontes["castigo"] = self.castigo.punicao(now)
+        reward += fontes["castigo"]                  # ser preso é recompensa negativa: o castigo ensina
+        reward = self.modulos.ajustar_recompensa(reward, fontes, dt)   # frentes: sem módulo, a mesma
         # expected = 0: recompensa bruta, como antes. O V entra pelo módulo que responder (PL-1; decisão D3).
         esperado = self.modulos.valor_esperado()
         self.brain.learn(reward, 0.0 if esperado is None else esperado, dt, self.prof["learn_rate"])

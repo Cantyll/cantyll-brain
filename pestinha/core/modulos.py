@@ -8,14 +8,16 @@ registro chama cada módulo ligado, na ordem em que foram registrados:
     carregar(pasta)                   ao abrir, com a pasta de estado do módulo
     sentir(intensidades, dt)          a cada `think`, antes do passo da rede; pode acrescentar canais
     depois_do_passo(cerebro, drives, dt)  logo depois do passo da rede
+    ajustar_recompensa(r, fontes, dt) o r do aprendizado, com as partes ({"carinho": ..., "dispensa": ...,
+                                      "castigo": ...}); cada módulo pode devolver um r novo, em cadeia
     valor_esperado()                  V de δ = r − V no aprendizado; no máximo um módulo responde
     ao_dormir(cerebro) / ao_acordar(cerebro)   quando ele adormece e quando acorda
     deslocar(segundos)                na volta da pausa: os prazos do módulo andam junto
     estado()                          resumo para a fotografia diária
     salvar(pasta)                     junto com o resto, a cada 30 s e ao fechar
 
-Sem nenhum módulo ligado, o registro não faz nada: as intensidades passam iguais, o valor esperado é
-None (o app usa 0, como antes) e nenhuma pasta é criada.
+Sem nenhum módulo ligado, o registro não faz nada: as intensidades passam iguais, a recompensa também,
+o valor esperado é None (o app usa 0, como antes) e nenhuma pasta é criada.
 
 Um módulo que levanta erro num encaixe é desligado na hora e o erro fica em `erros`: uma frente com
 defeito não derruba o pet, não impede o pânico, a pausa nem o fechamento.
@@ -30,8 +32,8 @@ from ..log import log
 
 NOME_DE_MODULO = re.compile(r"^[a-z][a-z0-9_]{0,39}$")     # vira nome de pasta
 
-ENCAIXES = ("carregar", "sentir", "depois_do_passo", "valor_esperado", "ao_dormir", "ao_acordar",
-            "deslocar", "estado", "salvar")
+ENCAIXES = ("carregar", "sentir", "depois_do_passo", "ajustar_recompensa", "valor_esperado", "ao_dormir",
+            "ao_acordar", "deslocar", "estado", "salvar")
 
 
 class Modulo:
@@ -43,6 +45,13 @@ class Modulo:
 
     def depois_do_passo(self, cerebro, drives, dt):
         """Logo depois do passo da rede, com o cérebro e a homeostase."""
+
+    def ajustar_recompensa(self, recompensa, fontes, dt):
+        """
+        A recompensa r deste passo, antes do aprendizado. `fontes` diz de onde veio cada parte (só leitura).
+        Devolve o r novo, ou None para deixar como está.
+        """
+        return None
 
     def valor_esperado(self):
         """V de δ = r − V. None = este módulo não responde. No máximo um módulo ligado sobrescreve isto."""
@@ -66,6 +75,12 @@ class Modulo:
 
     def carregar(self, pasta):
         """Lê o estado de `pasta`. Dado inválido: não aplica nada."""
+
+
+def _numero_finito(valor):
+    """Número de verdade (não bool, não NaN, não infinito)."""
+    return (not isinstance(valor, bool) and isinstance(valor, (int, float)) and valor == valor
+            and valor not in (float("inf"), float("-inf")))
 
 
 def _responde_valor(modulo):
@@ -141,15 +156,29 @@ class RegistroDeModulos:
     def depois_do_passo(self, cerebro, drives, dt):
         self._chamar("depois_do_passo", cerebro, drives, dt)
 
+    def ajustar_recompensa(self, recompensa, fontes, dt):
+        """
+        Passa r por cada módulo, na ordem. Resposta None, não numérica ou não finita deixa o r como estava.
+        Sem módulos, devolve o mesmo r (o mesmo objeto, bit a bit).
+        """
+        for modulo in list(self.modulos):
+            try:
+                novo = modulo.ajustar_recompensa(recompensa, dict(fontes), dt)
+            except Exception as erro:          # uma frente com defeito não derruba o pet
+                self.modulos.remove(modulo)
+                self.erros.append((modulo.nome, "ajustar_recompensa", repr(erro)))
+                log(f"[modulos] {modulo.nome} desligado: erro em ajustar_recompensa: {erro!r}")
+                continue
+            if _numero_finito(novo):
+                recompensa = float(novo)
+        return recompensa
+
     def valor_esperado(self):
         """O V do único módulo que responde, ou None. Valor não numérico ou não finito vale None."""
         for _modulo, valor in self._chamar("valor_esperado"):
             if valor is None:
                 continue
-            if isinstance(valor, bool) or not isinstance(valor, (int, float)) or valor != valor \
-                    or valor in (float("inf"), float("-inf")):
-                return None
-            return float(valor)
+            return float(valor) if _numero_finito(valor) else None
         return None
 
     def ao_dormir(self, cerebro):
