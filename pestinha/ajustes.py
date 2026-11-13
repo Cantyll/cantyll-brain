@@ -187,6 +187,7 @@ LAR_DURACAO_BAGUNCA = 8.0       # s: uma travessura de casa (pular na cama e bag
 LAR_PULOS_BAGUNCA = 1.5         # pulinhos por segundo enquanto bagunça a cama
 LAR_MEIA_VIDA_CARINHO_S = 30.0  # teto do carinho: depois de 30 s de carinho recente, ele ensina a metade (0 desliga)
 LAR_RECUPERACAO_CARINHO_H = 8.0 # τ da volta: a carga de carinho vaza com esta constante de tempo
+LAR_RECOMPENSA_TEDIO = 3.0      # reforço do lar (PL-1): recompensa total por tirar o tédio inteiro (1 → 0) bagunçando
 # <<< frente lar
 # >>> frente modelo_eu (dono: EU-1, EU-2)
 # <<< frente modelo_eu
@@ -202,6 +203,23 @@ LAR_RECUPERACAO_CARINHO_H = 8.0 # τ da volta: a carga de carinho vaza com esta 
 # <<< frente conversa
 # >>> frente bandeja_estado (dono: LAR-4)
 # <<< frente bandeja_estado
+# >>> frente plasticidade (dono: PL-1)
+# Plasticidade do BioBrain com erro de predição (PL-1, parte 1; spec, seções 7.2, 7.4 e 8). Desligada, o
+# BioBrain aprende como o LIF (recompensa bruta). Ligada: δ = r − V, com V de um crítico (core/conditioning.py,
+# decisão D3), e a taxa multiplicada por (0,5 + ACh). Só vale para o cérebro "bio". Números escolhidos, não medidos,
+# a não ser onde o comentário diz.
+PL_DELTA = False                # liga a regra δ = r − V no BioBrain (R7: desligada por padrão)
+PL_CRITICO_TAXA = 0.5           # por passo de 0,1 s: quão rápido o crítico aprende a prever (calibrado: 20 pares pista e
+                                # recompensa levam δ a ~0%; com 0,3 o PEDIDO ainda subia 10% em mais 20 pares)
+PL_CRITICO_TAU_S = 30.0         # τ_V: até quantos segundos depois de uma pista a recompensa ainda conta como dela
+PL_CRITICO_LIMITE = 5.0         # |peso| máximo de cada canal no crítico (só para não divergir)
+PL_ACH_TAU_S = 30.0             # τ da acetilcolina (spec, seção 8)
+PL_ACH_REF_HZ = 15.0            # taxa do FOCUS que vale ACh 1 (medido: semente 7, programando, ~15 Hz)
+# Canais que o crítico lê: as pistas, que vêm antes de uma interação. Contexto (atividade, tédio, carência) e a
+# própria sensação da recompensa (CARESS, DISMISS) ficam de fora: senão V vira a recompensa média de cada contexto,
+# que é quase zero, e quase nada mais ensina (ver core/bio/plasticidade.py). None: todos os canais.
+PL_CANAIS_CRITICO = ("PEDIDO", "ANTICIPATE", "ANTECIPA_PLACA", "PLACA", "VISITA", "TOY_NEAR", "TOY_TAKEN", "RECUSA")
+# <<< frente plasticidade
 
 # ---------------------------------------------------------------------------
 # Validação
@@ -307,6 +325,7 @@ _LIMITES = {
     "LAR_PULOS_BAGUNCA": (float, 0.0, 10.0),
     "LAR_MEIA_VIDA_CARINHO_S": (float, 0.0, 86400.0),
     "LAR_RECUPERACAO_CARINHO_H": (float, 0.01, 168.0),
+    "LAR_RECOMPENSA_TEDIO": (float, 0.0, 100.0),
     # <<< frente lar
     # >>> frente modelo_eu
     # <<< frente modelo_eu
@@ -322,6 +341,13 @@ _LIMITES = {
     # <<< frente conversa
     # >>> frente bandeja_estado
     # <<< frente bandeja_estado
+    # >>> frente plasticidade
+    "PL_CRITICO_TAXA": (float, 0.0, 1.0),
+    "PL_CRITICO_TAU_S": (float, 0.1, 3600.0),
+    "PL_CRITICO_LIMITE": (float, 0.0, 1000.0),
+    "PL_ACH_TAU_S": (float, 0.1, 3600.0),
+    "PL_ACH_REF_HZ": (float, 0.1, 500.0),
+    # <<< frente plasticidade
 }
 
 
