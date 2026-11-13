@@ -45,6 +45,11 @@ from .neuronios import TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, escala_de_corrente
 BIO_VERSION = 1
 
 
+# NE-3: os interneurônios excitatórios e o tipo de cada um.
+EXCITATORIOS_NE3 = ("ALERT", "FOCUS", "CURIOUS", "PLAYFUL", "CALM", "TIRED", "FRUSTRATION", "GLOOM")
+TIPO_NE3 = {name: "RS" for name in EXCITATORIOS_NE3}
+
+
 def neuronios_das_chaves():
     """
     (tipos, ganho, tau_sinaptico) que as chaves da frente NE em ajustes.py pedem (NE-2 a NE-4). Com todas
@@ -54,7 +59,17 @@ def neuronios_das_chaves():
     if ajustes.NE_INIBIDORES_FS:                                # NE-2
         tipos.update(QUIET="FS", INHIB="FS")
         ganho.update(QUIET=ajustes.NE_GANHO_QUIET, INHIB=ajustes.NE_GANHO_INHIB)
+    if ajustes.NE_EXCITATORIOS:                                 # NE-3
+        tipos.update(TIPO_NE3)
+        ganho.update(ALERT=ajustes.NE_GANHO_ALERT, FOCUS=ajustes.NE_GANHO_FOCUS, CURIOUS=ajustes.NE_GANHO_CURIOUS,
+                     PLAYFUL=ajustes.NE_GANHO_PLAYFUL, CALM=ajustes.NE_GANHO_CALM, TIRED=ajustes.NE_GANHO_TIRED,
+                     FRUSTRATION=ajustes.NE_GANHO_FRUSTRATION, GLOOM=ajustes.NE_GANHO_GLOOM)
     return tipos, ganho, {name: "membrana" for name in tipos}
+
+
+def gasto_das_chaves():
+    """Populações em que o pulso gasta a corrente sináptica (`gasta_corrente` do BioBrain), pelas chaves da NE-3."""
+    return set(EXCITATORIOS_NE3) if ajustes.NE_EXCITATORIOS else set()
 
 
 class Pool(dict):
@@ -77,21 +92,26 @@ class BioBrain(Brain):
     SEED = ns.LIFBrain.SEED
     izhikevich = None                                           # sem população em Izhikevich (padrão)
 
-    def __init__(self, seed=None, temperament=None, seed_ruido=None, tipos=None, ganho=None, tau_sinaptico=None):
+    def __init__(self, seed=None, temperament=None, seed_ruido=None, tipos=None, ganho=None, tau_sinaptico=None,
+                 gasta_corrente=None):
         """
         Mesmos argumentos do LIFBrain: seed (o indivíduo), temperament (ganhos) e seed_ruido (ruído reprodutível).
         NE-1, para as populações que saem do LIF: tipos = {população: tipo de Izhikevich}; ganho = {população:
         fator} sobre a escala de corrente (padrão: 1); tau_sinaptico = {população: τ em ms} para as correntes AMPA
-        e GABA (padrão: os da spec, 5 e 10 ms; "membrana" usa o τ_m que ela tinha no LIF). Sem nenhum dos três,
-        valem as chaves de ajustes.py (`neuronios_das_chaves`; todas desligadas: nenhuma população muda).
+        e GABA (padrão: os da spec, 5 e 10 ms; "membrana" usa o τ_m que ela tinha no LIF). NE-3: gasta_corrente =
+        populações em que cada pulso tira um limiar do LIF (reobase × ganho) da corrente sináptica, como o reset do
+        LIF. Sem nenhum dos quatro, valem as chaves de ajustes.py (`neuronios_das_chaves` e `gasto_das_chaves`;
+        todas desligadas: nenhuma população muda).
         """
-        if tipos is None and ganho is None and tau_sinaptico is None:
+        if tipos is None and ganho is None and tau_sinaptico is None and gasta_corrente is None:
             tipos, ganho, tau_sinaptico = neuronios_das_chaves()
+            gasta_corrente = gasto_das_chaves()
         self.seed = self.SEED if seed is None else seed
         self.temperament = dict(temperament or {})
         self.tipos = dict(tipos or {})
         ganho = dict(ganho or {})
         tau_sinaptico = dict(tau_sinaptico or {})
+        gasta_corrente = set(gasta_corrente or ())
         rng = np.random.default_rng(self.seed)
         self.rng = np.random.default_rng(seed_ruido)
 
@@ -142,7 +162,7 @@ class BioBrain(Brain):
             sl = self.pool(name).fatia
             tau_m[sl], adapt_b[sl], adapt_tau[sl] = tau, b, bt
         tau_m *= rng.uniform(0.9, 1.1, self.N)                  # heterogeneidade (o 1º sorteio, como no LIF)
-        self._montar_neuronios(tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico)
+        self._montar_neuronios(tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico, gasta_corrente)
 
         # ---------------- receptores sensoriais ----------------
         self.s_rate = np.zeros(Ns)
@@ -260,7 +280,7 @@ class BioBrain(Brain):
             sl = self.pool(name).fatia
             self.s_prob[sl] = self.s_rate[sl] * level * 0.001
 
-    def _montar_neuronios(self, tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico):
+    def _montar_neuronios(self, tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico, gasta_corrente=()):
         """
         Divide os neurônios não sensoriais em dois grupos: LIF (`self.neuronios`) e Izhikevich
         (`self.izhikevich`, só se `tipos` tiver alguma população). Não sorteia nada: as sinapses e a ordem do
@@ -272,9 +292,9 @@ class BioBrain(Brain):
                 raise ValueError(f"população sem neurônio para trocar: {name!r}")
             if tipo not in TIPOS:
                 raise ValueError(f"tipo de neurônio desconhecido para {name}: {tipo!r}")
-        for name in (*ganho, *tau_sinaptico):
+        for name in (*ganho, *tau_sinaptico, *gasta_corrente):
             if name not in self.tipos:
-                raise ValueError(f"ganho e tau_sinaptico só valem para população em Izhikevich: {name!r}")
+                raise ValueError(f"ganho, tau_sinaptico e gasta_corrente só valem para população em Izhikevich: {name!r}")
         for name, tau in tau_sinaptico.items():
             if tau != "membrana" and not (isinstance(tau, (int, float)) and math.isfinite(tau) and tau > 0):
                 raise ValueError(f"tau_sinaptico de {name} precisa ser ms positivo ou 'membrana': {tau!r}")
@@ -286,10 +306,13 @@ class BioBrain(Brain):
         escala = np.zeros(self.N)
         tau_ampa = np.full(self.N, TAU_AMPA)
         tau_gaba = np.full(self.N, TAU_GABA)
+        gasto = np.zeros(self.N)
         for name, tipo in self.tipos.items():
             sl = self.pool(name).fatia
             tipo_de[sl] = tipo
             escala[sl] = escala_de_corrente(tipo, tau_m[sl]) * float(ganho.get(name, 1.0))
+            if name in gasta_corrente:                          # um limiar do LIF em corrente: reobase × ganho
+                gasto[sl] = escala[sl] * (1.0 - np.exp(-1.0 / tau_m[sl]))
             tau = tau_sinaptico.get(name)
             if tau is not None:
                 tau_ampa[sl] = tau_gaba[sl] = tau_m[sl] if tau == "membrana" else float(tau)
@@ -298,7 +321,7 @@ class BioBrain(Brain):
         lif = locais_lif + Ns
         self.neuronios = Neuronio(tau_m[lif], adapt_b[lif], adapt_tau[lif])
         g = locais_izh + Ns
-        self.izhikevich = Izhikevich(tipo_de[g], escala[g], tau_ampa[g], tau_gaba[g])
+        self.izhikevich = Izhikevich(tipo_de[g], escala[g], tau_ampa[g], tau_gaba[g], gasto[g])
         self._locais_lif, self._locais_izh = locais_lif, locais_izh
         # corrente de ausência (R1) nos índices de cada grupo
         self._ausencia_lif = np.flatnonzero(np.isin(locais_lif, self._idx_ausencia))
