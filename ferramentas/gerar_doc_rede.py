@@ -104,9 +104,12 @@ def main():
         "integração lenta.",
         "- **Gasto:** nas populações excitatórias e motoras, cada pulso tira da corrente um limiar do LIF "
         "(reobase × ganho), como o reset do LIF (NE-3). As inibitórias FS não gastam.",
+        "- **Adaptação lenta:** no LIF o limiar sobe a cada pulso e volta em segundos; o u do Izhikevich só adapta em "
+        "~50 ms. A `ALERT` e o `STARTLE` levam a adaptação do LIF como corrente (`rede.ADAPTACAO_LENTA`): sem ela o "
+        "pet se assusta a mais com estímulo fraco e contínuo. Nas outras populações ela fica de fora (o portão A piora).",
         "- **Ganhos:** ajustados para a taxa de cada população ficar a do LIF "
-        "(`python ferramentas/comparar_izhikevich.py --ajustar ne3` e `--ajustar ne4`). O do `STARTLE`, em CH, "
-        "iguala o reflexo de susto, não a taxa (`--comportamento ne4`).",
+        "(`python ferramentas/comparar_izhikevich.py --ajustar ne3` e `--ajustar ne4`). Os da `ALERT` e do `STARTLE`, "
+        "em CH, igualam o susto do LIF em eventos curtos, não a taxa (`--comportamento ne4`, `tests/test_ne_susto.py`).",
         "",
         "## Como o sinal anda",
         "",

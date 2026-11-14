@@ -134,38 +134,39 @@ GANHO_PAPEL = 0.05              # bolinhas de papel por segundo, por Hz do motor
 NE_INIBIDORES_FS = False        # NE-2: QUIET e INHIB em Izhikevich FS (R7: desligado por padrão)
 NE_GANHO_QUIET = 1.0            # medido (comparar_izhikevich.py --calibrar): com 1,0 a QUIET dá 2,3 Hz contra 2,4 do LIF
 NE_GANHO_INHIB = 1.2            # medido (idem): com 1,0 a INHIB dá 24 Hz contra 37 do LIF; com 1,2, 35
-NE_EXCITATORIOS = False         # NE-3: os 8 interneurônios excitatórios em Izhikevich RS (R7: desligado por padrão).
+NE_EXCITATORIOS = False         # NE-3: os 8 excitatórios em Izhikevich (7 RS, ALERT CH) (R7: desligado por padrão).
 #                                 Neles o pulso gasta um limiar do LIF da corrente sináptica (gasta_corrente), como o
 #                                 reset do LIF: sem isso a corrente lenta (τ de 60 a 400 ms) sustenta trens de disparo.
 # Ganhos da NE-3, ajustados por bisseção para a taxa somada em 9 contextos (sementes 3, 7 e 11) ficar igual à do LIF
-# (±2% na 10ª rodada): python ferramentas/comparar_izhikevich.py --ajustar ne3. Valem com a NE-2 ligada.
-NE_GANHO_ALERT = 1.591
-NE_GANHO_FOCUS = 1.025
-NE_GANHO_CURIOUS = 1.04
-NE_GANHO_PLAYFUL = 1.014
+# (±2% na 10ª rodada): python ferramentas/comparar_izhikevich.py --ajustar ne3. Valem com a NE-2 ligada. A ALERT fica
+# fora da bisseção: em CH e com a adaptação lenta do LIF, o ganho dela iguala o susto do LIF (tests/test_ne_susto.py).
+NE_GANHO_ALERT = 1.0              # ALERT em CH, com a adaptação lenta: ajustado pelo susto (--comportamento)
+NE_GANHO_FOCUS = 1.028
+NE_GANHO_CURIOUS = 1.028
+NE_GANHO_PLAYFUL = 1.015
 NE_GANHO_CALM = 0.92
-NE_GANHO_TIRED = 0.957
-NE_GANHO_FRUSTRATION = 1.04
-NE_GANHO_GLOOM = 0.894
+NE_GANHO_TIRED = 0.96
+NE_GANHO_FRUSTRATION = 1.015
+NE_GANHO_GLOOM = 0.885
 NE_MOTORES = False              # NE-4: os 15 motores em Izhikevich (14 RS, STARTLE CH), o pulso gasta a corrente (R7)
 # Ganhos da NE-4, ajustados como os da NE-3 (python ferramentas/comparar_izhikevich.py --ajustar ne4), com a NE-2 e a
 # NE-3 ligadas. Os limiares de decisão em Hz (LIMIAR_*_HZ, castigo_ctl, mesa, MotorDecoder, Emotion) não mudam: a
 # NE-4 só passa se as taxas e o comportamento decodificado ficarem os do LIF (tests/test_ne4_motores.py). O STARTLE
 # fica fora da bisseção: o ganho dele iguala o reflexo de susto (--comportamento ne4), não a taxa somada.
-NE_GANHO_STARTLE = 0.5
-NE_GANHO_WATCH = 0.809
-NE_GANHO_WANDER = 0.87
-NE_GANHO_CHEER = 0.968
-NE_GANHO_SETTLE = 1.055
+NE_GANHO_STARTLE = 0.55
+NE_GANHO_WATCH = 0.893
+NE_GANHO_WANDER = 0.885
+NE_GANHO_CHEER = 0.96
+NE_GANHO_SETTLE = 1.059
 NE_GANHO_DROWSE = 0.964
 NE_GANHO_ANGRY = 1.087
-NE_GANHO_SAD = 1.011
+NE_GANHO_SAD = 0.998
 NE_GANHO_SENTAR = 0.866
-NE_GANHO_FUGIR = 1.078
-NE_GANHO_CARTAZ = 0.998
+NE_GANHO_FUGIR = 1.087
+NE_GANHO_CARTAZ = 1.015
 NE_GANHO_CANTO = 1.011
-NE_GANHO_TRAVESSURA = 0.993
-NE_GANHO_PAPEL = 1.024
+NE_GANHO_TRAVESSURA = 1.006
+NE_GANHO_PAPEL = 1.032
 NE_GANHO_ACEITAR = 1.002
 # Numba (decisão do Cantyll, 2026-11-13, opção C): com o Numba instalado (requirements-numba.txt), o passo do BioBrain
 # roda compilado, com os mesmos pulsos do numpy (core/bio/acelerado.py). Sem o Numba, ou com False, fica o numpy.
