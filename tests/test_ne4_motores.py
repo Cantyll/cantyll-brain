@@ -1,6 +1,6 @@
 """
-NE-4 (plano, onda 2): os 15 motores do BioBrain em Izhikevich, atrás da chave ajustes.NE_MOTORES, desligada por
-padrão (R7). Quatorze em RS; o STARTLE em CH (rajadas), porque em RS o reflexo de susto, lido na subida, some.
+NE-4 (plano, onda 2): os 15 motores do BioBrain em Izhikevich, atrás da chave ajustes.NE_MOTORES, ligada por
+padrão desde a NE-5. Quatorze em RS; o STARTLE em CH (rajadas), porque em RS o reflexo de susto, lido na subida, some.
 
 Com a chave ligada, os motores usam τ sináptico = τ_m do LIF (opção A), os ganhos de ajustes.py e o pulso gasta um
 limiar do LIF da corrente (como na NE-3). Os limiares de decisão em Hz não mudam: os critérios são relativos ao LIF
@@ -31,8 +31,14 @@ def ne4(monkeypatch):
     monkeypatch.setattr(ajustes, "NE_MOTORES", True)
 
 
-def test_chave_desligada_por_padrao():
-    assert ajustes.NE_MOTORES is False
+def _desligar(monkeypatch):
+    """Desde a NE-5 as chaves vêm ligadas (PESTINHA_NE=0 desliga): aqui, desligadas uma a uma."""
+    for chave in ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES"):
+        monkeypatch.setattr(ajustes, chave, False)
+
+
+def test_chave_desligada_nada_muda(monkeypatch):
+    _desligar(monkeypatch)
     assert all(name not in neuronios_das_chaves()[0] for name in MOTORES_NE4)
     assert not set(MOTORES_NE4) & gasto_das_chaves()
 
@@ -58,6 +64,7 @@ def test_chave_ligada_poe_14_em_rs_e_o_startle_em_ch(ne4):
 
 def test_motores_sem_as_outras_chaves(monkeypatch):
     """A chave da NE-4 vale sozinha: só os motores saem do LIF."""
+    _desligar(monkeypatch)
     monkeypatch.setattr(ajustes, "NE_MOTORES", True)
     tipos, _, _ = neuronios_das_chaves()
     assert set(tipos) == set(MOTORES_NE4) and gasto_das_chaves() == set(MOTORES_NE4)

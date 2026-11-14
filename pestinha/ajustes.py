@@ -131,10 +131,15 @@ GANHO_PAPEL = 0.05              # bolinhas de papel por segundo, por Hz do motor
 # Neurônios do BioBrain (frente NE; core/bio/neuronios.py). Só valem para o cérebro "bio". Toda população que
 # migra usa τ sináptico = τ_m que tinha no LIF (decisão do Cantyll, 2026-11-13, opção A); o ganho multiplica a
 # escala de partida (escala_de_corrente: a mesma entrada mínima de disparo do LIF).
-NE_INIBIDORES_FS = False        # NE-2: QUIET e INHIB em Izhikevich FS (R7: desligado por padrão)
+# NE-5 (decisão do Cantyll, 2026-11-13, opção B): as três chaves ficam ligadas por padrão. PESTINHA_NE=0 no ambiente
+# desliga as três sem mexer no código: o BioBrain volta aos neurônios LIF, para separar o efeito do cérebro do efeito
+# do neurônio.
+from os import environ as _ambiente  # noqa: E402 (só a seção da frente NE usa)
+_NE_LIGADA = _ambiente.get("PESTINHA_NE", "1").strip() != "0"
+NE_INIBIDORES_FS = _NE_LIGADA   # NE-2: QUIET e INHIB em Izhikevich FS
 NE_GANHO_QUIET = 1.0            # medido (comparar_izhikevich.py --calibrar): com 1,0 a QUIET dá 2,3 Hz contra 2,4 do LIF
 NE_GANHO_INHIB = 1.2            # medido (idem): com 1,0 a INHIB dá 24 Hz contra 37 do LIF; com 1,2, 35
-NE_EXCITATORIOS = False         # NE-3: os 8 excitatórios em Izhikevich (7 RS, ALERT CH) (R7: desligado por padrão).
+NE_EXCITATORIOS = _NE_LIGADA    # NE-3: os 8 excitatórios em Izhikevich (7 RS, ALERT CH).
 #                                 Neles o pulso gasta um limiar do LIF da corrente sináptica (gasta_corrente), como o
 #                                 reset do LIF: sem isso a corrente lenta (τ de 60 a 400 ms) sustenta trens de disparo.
 # Ganhos da NE-3, ajustados por bisseção para a taxa somada em 9 contextos (sementes 3, 7 e 11) ficar igual à do LIF
@@ -148,7 +153,7 @@ NE_GANHO_CALM = 0.92
 NE_GANHO_TIRED = 0.96
 NE_GANHO_FRUSTRATION = 1.015
 NE_GANHO_GLOOM = 0.885
-NE_MOTORES = False              # NE-4: os 15 motores em Izhikevich (14 RS, STARTLE CH), o pulso gasta a corrente (R7)
+NE_MOTORES = _NE_LIGADA         # NE-4: os 15 motores em Izhikevich (14 RS, STARTLE CH), o pulso gasta a corrente
 # Ganhos da NE-4, ajustados como os da NE-3 (python ferramentas/comparar_izhikevich.py --ajustar ne4), com a NE-2 e a
 # NE-3 ligadas. Os limiares de decisão em Hz (LIMIAR_*_HZ, castigo_ctl, mesa, MotorDecoder, Emotion) não mudam: a
 # NE-4 só passa se as taxas e o comportamento decodificado ficarem os do LIF (tests/test_ne4_motores.py). O STARTLE
@@ -251,8 +256,8 @@ LAR_RECOMPENSA_TEDIO = 3.0      # reforço do lar (PL-1): recompensa total por t
 # BioBrain aprende como o LIF (recompensa bruta). Ligada: δ = r − V, com V de um crítico (core/conditioning.py,
 # decisão D3), e a taxa multiplicada por (0,5 + ACh). Só vale para o cérebro "bio". Números escolhidos, não medidos,
 # a não ser onde o comentário diz.
-PL_DELTA = True                 # δ = r − V no BioBrain. Ligada por padrão desde 2026-11-13 (decisão do Cantyll); o app
-                                # segue no LIF (config.CEREBRO), então só vale quando o cérebro for o bio
+PL_DELTA = True                 # δ = r − V no BioBrain. Ligada por padrão desde 2026-11-13 (decisão do Cantyll); vale
+                                # no app desde a NE-5 (cérebro bio)
 PL_CRITICO_TAXA = 0.5           # por passo de 0,1 s: quão rápido o crítico aprende a prever (calibrado: 20 pares pista e
                                 # recompensa levam δ a ~0%; com 0,3 o PEDIDO ainda subia 10% em mais 20 pares)
 PL_CRITICO_TAU_S = 30.0         # τ_V: até quantos segundos depois de uma pista a recompensa ainda conta como dela

@@ -1,6 +1,6 @@
 """
 NE-2 (plano, onda 2): os interneurônios inibitórios do BioBrain (QUIET e INHIB) em Izhikevich FS, atrás da chave
-ajustes.NE_INIBIDORES_FS, desligada por padrão (R7). Ligar por padrão é decisão do Cantyll, em PR à parte.
+ajustes.NE_INIBIDORES_FS, ligada por padrão desde a NE-5 (PESTINHA_NE=0 desliga as três chaves da frente).
 
 Com a chave ligada, as duas populações usam τ sináptico = τ_m do LIF (opção A, 2026-11-13) e os ganhos de
 ajustes.py. Os critérios são relativos ao LIF (plano, seção 2, regra 7).
@@ -18,11 +18,18 @@ from pestinha.core.bio.rede import neuronios_das_chaves
 
 @pytest.fixture
 def ne2(monkeypatch):
+    _desligar(monkeypatch)
     monkeypatch.setattr(ajustes, "NE_INIBIDORES_FS", True)
 
 
-def test_chave_desligada_por_padrao():
-    assert ajustes.NE_INIBIDORES_FS is False
+def _desligar(monkeypatch):
+    """Desde a NE-5 as chaves vêm ligadas (PESTINHA_NE=0 desliga): aqui, desligadas uma a uma."""
+    for chave in ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES"):
+        monkeypatch.setattr(ajustes, chave, False)
+
+
+def test_chave_desligada_nada_muda(monkeypatch):
+    _desligar(monkeypatch)
     assert neuronios_das_chaves() == ({}, {}, {})
     b = BioBrain(seed=7)
     assert b.tipos == {} and b.izhikevich is None

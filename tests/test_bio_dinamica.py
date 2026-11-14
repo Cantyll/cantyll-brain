@@ -12,9 +12,19 @@ import importlib
 import numpy as np
 import pytest
 
+from pestinha import ajustes
 from pestinha.core.bio import BIO_VERSION, BioBrain
 from pestinha.core.bio.projecoes import Projecao, compilar, projecao_de_bloco
 from pestinha.core.nervous_system import LIFBrain
+
+
+
+@pytest.fixture(autouse=True)
+def _neuronio_do_lif(monkeypatch):
+    """A paridade é com o neurônio do LIF: as chaves da frente NE (ligadas por padrão desde a NE-5) o trocam."""
+    for chave in ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES"):
+        monkeypatch.setattr(ajustes, chave, False)
+
 
 TEMPERAMENTO = {"PLAYFUL": 1.3, "DRAG->ALERT": 0.5}
 SEQUENCIA = [
