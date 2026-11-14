@@ -33,7 +33,7 @@ def _no_ambiente(codigo, **variaveis):
     ambiente.update(variaveis)
     saida = subprocess.run([sys.executable, "-c", codigo], cwd=RAIZ, env=ambiente, capture_output=True, text=True,
                            check=True)
-    return saida.stdout.strip()
+    return saida.stdout.strip().splitlines()[-1]          # a última linha: antes dela pode vir o log da rede
 
 
 VER = ("from pestinha import ajustes, config; "

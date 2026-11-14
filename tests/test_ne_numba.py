@@ -103,3 +103,14 @@ def test_sem_numba_fica_o_numpy(monkeypatch):
     b = BioBrain(seed=7, tipos={})
     assert b.numba is False
     b.step(50)                                                  # o caminho de reserva roda
+
+
+def test_o_log_diz_uma_vez_qual_passo_vale(monkeypatch):
+    """O executável traz o Numba: a primeira rede do processo diz no log se ele está valendo e, se não, por quê."""
+    linhas = []
+    monkeypatch.setattr(acelerado, "log", lambda *partes: linhas.append(" ".join(map(str, partes))))
+    monkeypatch.setattr(acelerado, "_avisado", False)
+    BioBrain(seed=7)
+    BioBrain(seed=8)
+    assert len(linhas) == 1
+    assert ("Numba" in linhas[0]) if acelerado.DISPONIVEL and ajustes.NE_NUMBA else ("numpy" in linhas[0])
