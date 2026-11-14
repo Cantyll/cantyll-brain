@@ -30,6 +30,8 @@ SEMENTES = range(41, 81)
 def test_alert_e_startle_em_ch_com_adaptacao_lenta(monkeypatch):
     assert TIPO_NE3["ALERT"] == TIPO_NE4["STARTLE"] == "CH"
     assert ADAPTACAO_LENTA == ("ALERT", "STARTLE")
+    for chave in ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES"):
+        monkeypatch.setattr(ajustes, chave, False)
     assert adaptacao_das_chaves() == set()                     # chaves desligadas: nada muda
     monkeypatch.setattr(ajustes, "NE_EXCITATORIOS", True)
     assert adaptacao_das_chaves() == {"ALERT"}

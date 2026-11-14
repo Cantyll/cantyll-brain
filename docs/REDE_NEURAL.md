@@ -6,7 +6,7 @@ A rede tem **470 neurônios**, **15808 sinapses**, **30 canais sensoriais**, **1
 
 ## Modelo de neurônio
 
-Há dois cérebros com a mesma rede (as mesmas populações e sinapses): o `LIFBrain`, padrão do app hoje, e o `BioBrain` (`PESTINHA_CEREBRO=bio` ou `cerebro = "bio"`). No `LIFBrain` todo neurônio é de integração e disparo com vazamento (LIF). No `BioBrain`, as chaves da frente NE em `ajustes.py` passam populações para o modelo de Izhikevich, uma frente por vez: `NE_INIBIDORES_FS`, `NE_EXCITATORIOS`, `NE_MOTORES`. Todas desligadas agora (R7). As colunas "Com as chaves NE" abaixo dizem o modelo de cada população com as três ligadas (tipo e ganho sobre a escala de corrente).
+Há dois cérebros com a mesma rede (as mesmas populações e sinapses): o `BioBrain`, padrão do app desde a NE-5, e o `LIFBrain` (`PESTINHA_CEREBRO=lif` no ambiente). Cada um grava o próprio arquivo de estado (`nervous.json` o LIF, `nervous_bio.json` o bio). No `LIFBrain` todo neurônio é de integração e disparo com vazamento (LIF). No `BioBrain`, as chaves da frente NE em `ajustes.py` passam populações para o modelo de Izhikevich, uma frente por vez: `NE_INIBIDORES_FS`, `NE_EXCITATORIOS`, `NE_MOTORES`. Ligadas agora: `NE_INIBIDORES_FS`, `NE_EXCITATORIOS`, `NE_MOTORES`. `PESTINHA_NE=0` no ambiente desliga as três. As colunas "Com as chaves NE" abaixo dizem o modelo de cada população com as três ligadas (tipo e ganho sobre a escala de corrente).
 
 | Tipo | a | b | c (mV) | d | Reobase | Populações com as chaves NE |
 |---|---:|---:|---:|---:|---:|---|

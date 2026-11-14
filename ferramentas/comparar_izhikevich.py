@@ -81,7 +81,7 @@ def _todas():
 
 
 CONFIGS = {
-    "lif": {},
+    "lif": {"tipos": {}},          # tudo no LIF (desde a NE-5 o BioBrain sem argumentos segue as chaves, ligadas)
     "ne2": {"tipos": {"QUIET": "FS", "INHIB": "FS"}},
     "todas_spec": {"tipos": _todas()},
     "todas_membrana": {"tipos": _todas(), "tau_sinaptico": {name: "membrana" for name in _todas()}},
@@ -96,11 +96,14 @@ CHAVES = {
 
 
 def _com_chaves(frente):
-    """Os argumentos de BioBrain que as chaves da frente pedem (as outras chaves como estão em ajustes.py)."""
-    antes = {k: getattr(ajustes, k) for k in CHAVES[frente]}
+    """
+    Os argumentos de BioBrain que as chaves da frente pedem: as dela ligadas, as das frentes seguintes desligadas
+    (desde a NE-5 as três vêm ligadas em ajustes.py).
+    """
+    antes = {k: getattr(ajustes, k) for k in CHAVES["ne4"]}
     try:
-        for k in CHAVES[frente]:
-            setattr(ajustes, k, True)
+        for k in CHAVES["ne4"]:
+            setattr(ajustes, k, k in CHAVES[frente])
         tipos, ganho, tau = neuronios_das_chaves()
         gasta = gasto_das_chaves()
         lenta = adaptacao_das_chaves()
@@ -346,8 +349,8 @@ def portao(frente, extra=()):
     """Portão A da linha de base com as chaves da frente ligadas."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import linha_de_base
-    for k in CHAVES[frente]:
-        setattr(ajustes, k, True)
+    for k in CHAVES["ne4"]:
+        setattr(ajustes, k, k in CHAVES[frente])
     argv = ["linha_de_base.py", "--cerebro", "bio", *extra]
     if multiprocessing.get_start_method() != "fork" and "--processos" not in extra:
         argv += ["--processos", "1"]

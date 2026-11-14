@@ -1,6 +1,6 @@
 """
 NE-3 (plano, onda 2): os 8 interneurônios excitatórios do BioBrain (ALERT, FOCUS, CURIOUS, PLAYFUL, CALM, TIRED,
-FRUSTRATION, GLOOM) em Izhikevich, atrás da chave ajustes.NE_EXCITATORIOS, desligada por padrão (R7). Sete em RS;
+FRUSTRATION, GLOOM) em Izhikevich, atrás da chave ajustes.NE_EXCITATORIOS, ligada por padrão desde a NE-5. Sete em RS;
 a ALERT em CH, com a adaptação lenta do LIF (tests/test_ne_susto.py).
 
 Com a chave ligada, as 8 populações usam τ sináptico = τ_m do LIF (opção A, 2026-11-13), os ganhos de ajustes.py,
@@ -23,12 +23,19 @@ TAU_M = {name: t for name, _k, _n, t, *_ in ns.INTER_SPEC}
 
 @pytest.fixture
 def ne3(monkeypatch):
+    _desligar(monkeypatch)
     monkeypatch.setattr(ajustes, "NE_INIBIDORES_FS", True)
     monkeypatch.setattr(ajustes, "NE_EXCITATORIOS", True)
 
 
-def test_chave_desligada_por_padrao():
-    assert ajustes.NE_EXCITATORIOS is False
+def _desligar(monkeypatch):
+    """Desde a NE-5 as chaves vêm ligadas (PESTINHA_NE=0 desliga): aqui, desligadas uma a uma."""
+    for chave in ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES"):
+        monkeypatch.setattr(ajustes, chave, False)
+
+
+def test_chave_desligada_nada_muda(monkeypatch):
+    _desligar(monkeypatch)
     assert gasto_das_chaves() == set()
     assert all(name not in neuronios_das_chaves()[0] for name in EXCITATORIOS_NE3)
 

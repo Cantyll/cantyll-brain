@@ -184,8 +184,8 @@ def _rodar(brain, segundos, sentidos):
         brain.step(100)
 
 
-def test_padrao_e_nenhuma_populacao_em_izhikevich():
-    b = BioBrain(seed=7)
+def test_sem_tipos_nenhuma_populacao_em_izhikevich():
+    b = BioBrain(seed=7, tipos={})          # desde a NE-5, sem argumentos valem as chaves (ligadas por padrão)
     assert b.tipos == {} and b.izhikevich is None and b.neuronios.n == b.Nl
 
 
