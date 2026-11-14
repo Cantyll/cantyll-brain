@@ -10,11 +10,15 @@ Por que ajuda: com 470 neurônios o passo em numpy é feito de ~60 chamadas pequ
 (1 a 2 µs) pesa mais que a conta. Aqui são quatro chamadas: propagar, LIF, Izhikevich e o fechamento do passo.
 
 Na primeira vez a compilação leva alguns segundos; o resultado fica em cache (__pycache__ ao lado deste
-arquivo, ou em NUMBA_CACHE_DIR) e as próximas partidas só carregam.
+arquivo, ou em NUMBA_CACHE_DIR) e as próximas partidas só carregam. No executável (PyInstaller) não há o .py ao
+lado: o Numba usa a pasta de cache do usuário (no Windows, %LOCALAPPDATA%\numba), marcada pelo próprio executável.
+Não defina NUMBA_CACHE_DIR no executável: esse caminho exige o .py e desliga o cache.
 
 Dono: frente NE.
 """
 import os
+
+from ...log import log
 
 DISPONIVEL = False
 MOTIVO = ""
@@ -28,6 +32,21 @@ else:
     else:
         DISPONIVEL = True
         VERSAO = numba.__version__
+
+_avisado = False
+
+
+def avisar(usando):
+    """Uma linha no log, na primeira rede do processo: qual passo vale e, sem o Numba, por quê."""
+    global _avisado
+    if _avisado:
+        return
+    _avisado = True
+    if usando:
+        log(f"[bio] passo compilado com Numba {VERSAO}")
+    else:
+        log(f"[bio] passo em numpy ({MOTIVO or 'ajustes.NE_NUMBA = False'})")
+
 
 if DISPONIVEL:
     _jit = numba.njit(cache=True, nogil=True, fastmath=False, error_model="numpy")

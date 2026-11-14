@@ -201,6 +201,7 @@ class BioBrain(Brain):
         tau_m *= rng.uniform(0.9, 1.1, self.N)                  # heterogeneidade (o 1º sorteio, como no LIF)
         self._montar_neuronios(tau_m, adapt_b, adapt_tau, ganho, tau_sinaptico, gasta_corrente, adaptacao_lenta)
         self.numba = acelerado.DISPONIVEL and ajustes.NE_NUMBA      # o passo compilado (core/bio/acelerado.py)
+        acelerado.avisar(self.numba)
 
         # ---------------- receptores sensoriais ----------------
         self.s_rate = np.zeros(Ns)

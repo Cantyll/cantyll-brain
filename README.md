@@ -155,7 +155,7 @@ O PyInstaller só gera o executável do sistema onde roda, por isso um Windows n
 
 #### Opção 1: no seu computador
 
-1. Instale as dependências de desenvolvimento (inclui o PyInstaller):
+1. Instale as dependências de desenvolvimento (inclui o PyInstaller e o Numba, que deixa o cérebro bio mais leve):
 
    ```bash
    pip install -r requirements-dev.txt
