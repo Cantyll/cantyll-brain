@@ -21,8 +21,13 @@ from pestinha import ajustes
 
 @pytest.fixture(autouse=True)
 def _regra_do_lif(monkeypatch):
-    """A paridade é com a regra do LIF: o PL-1 (ligado por padrão no bio) muda o aprendizado de propósito."""
+    """
+    A paridade é com a regra e o neurônio do LIF: o PL-1 (ligado por padrão no bio) muda o aprendizado de propósito,
+    e as chaves da frente NE (ligadas por padrão desde a NE-5) trocam o neurônio.
+    """
     monkeypatch.setattr(ajustes, "PL_DELTA", False)
+    for chave in ("NE_INIBIDORES_FS", "NE_EXCITATORIOS", "NE_MOTORES"):
+        monkeypatch.setattr(ajustes, chave, False)
 
 SEQUENCIA = [
     ({"CARESS": 1.0, "POKE": 0.4}, 1.0),

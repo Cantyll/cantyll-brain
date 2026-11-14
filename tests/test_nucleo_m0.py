@@ -124,12 +124,12 @@ def test_criar_cerebro_e_escolha_pela_configuracao():
     assert isinstance(criar_cerebro(seed=7), Brain)
     with pytest.raises(ValueError):
         criar_cerebro("izhikevich")
-    # o padrão do app segue o LIF (V7); o conftest troca só com PESTINHA_CEREBRO
-    assert config.CEREBRO == (os.environ.get("PESTINHA_CEREBRO", "").strip() or "lif")
+    # o padrão do app é o bio desde a NE-5 (V7, opção B); PESTINHA_CEREBRO troca (tests/test_troca_padrao.py)
+    assert config.CEREBRO == (os.environ.get("PESTINHA_CEREBRO", "").strip() or "bio")
     assert config.CEREBROS_PRONTOS == ("lif", "bio")
     assert config.cerebro_escolhido("lif") == "lif"
     assert config.cerebro_escolhido("bio") == "bio"
-    assert config.cerebro_escolhido("izhikevich") == "lif"   # não pronto: volta ao padrão
+    assert config.cerebro_escolhido("izhikevich") == "lif"   # não pronto: volta ao LIF
 
 
 def test_mesma_semente_de_ruido_mesmo_estado():

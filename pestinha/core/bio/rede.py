@@ -19,13 +19,15 @@ elegibilidade sobre os níveis sensoriais e δ = r − V, aplicada a projeções
 população). O peso efetivo de cada sinapse plástica é base + learned × unidade, a mesma conta do LIF. A troca
 para STDP por pulso é a frente PL-1, em core/bio/plasticidade.py.
 
-Está em config.CEREBROS_PRONTOS desde o T2.4; o padrão segue "lif" até o Cantyll decidir a troca (V7).
+Está em config.CEREBROS_PRONTOS desde o T2.4 e é o padrão do app desde a NE-5 (V7; decisão do Cantyll, opção B).
+Grava num arquivo próprio, ao lado do arquivo do LIF (arquivo_do_bio).
 
 Dono: T2. Depois do T2, só a frente NE edita este arquivo (plano, seção 5).
 """
 import math
 import time
 from collections import deque
+from pathlib import Path
 
 import numpy as np
 
@@ -44,6 +46,19 @@ from .projecoes import compilar, projecao_de_bloco
 from .neuronios import PICO, TAU_AMPA, TAU_GABA, TIPOS, Izhikevich, escala_de_corrente  # NE-1
 
 BIO_VERSION = 1
+
+
+def arquivo_do_bio(path):
+    """
+    Onde o BioBrain grava e lê (NE-5). O app passa o arquivo da rede do pet (PetPaths.nervous: nervous.json, ou
+    <pet>_nervous.json no modo compatível), que é o do LIFBrain. O bio usa o vizinho com _bio (nervous_bio.json):
+    trocar de cérebro, nos dois sentidos, não sobrescreve o estado do outro. Os dois não são convertidos um no outro
+    (decisão D7). Outro nome (testes, ferramentas) fica como está.
+    """
+    p = Path(path)
+    if p.name == "nervous.json" or p.name.endswith("_nervous.json"):
+        return p.with_name(f"{p.stem}_bio{p.suffix}")
+    return p
 
 
 # NE-3: os interneurônios excitatórios e o tipo de cada um.
@@ -611,14 +626,15 @@ class BioBrain(Brain):
         }
         if self.plasticidade is not None:
             data["plasticidade"] = self.plasticidade.estado()     # PL-1: crítico e ACh (campo opcional)
-        write_json(path, data)
+        write_json(arquivo_do_bio(path), data)
 
     def load(self, path):
         """
         Restaura habituação e aprendizado. Tudo é validado antes de aplicar: tipo, versão, semente, populações,
-        valores finitos e dentro do domínio. Se algo falhar, nada muda. Save do LIF não é lido (decisão D7).
+        valores finitos e dentro do domínio. Se algo falhar, nada muda. Save do LIF não é lido (decisão D7). O arquivo
+        lido é o de arquivo_do_bio(path).
         """
-        data = read_json(path, default=None)
+        data = read_json(arquivo_do_bio(path), default=None)
         if not isinstance(data, dict):
             return False
         try:

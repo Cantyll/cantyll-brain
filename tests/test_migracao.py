@@ -198,6 +198,7 @@ def criar_app(tmp_path, monkeypatch, pet="bryan"):
     QApplication.instance() or QApplication([])
     import pestinha.app as app_mod
     monkeypatch.setattr(app_mod, "PanicHotkey", lambda: SimpleNamespace(ok=True, pressed=Mock()))
+    monkeypatch.setattr(config, "CEREBRO", "lif")     # PetPaths.todos() tem o arquivo do LIF; o do bio: test_troca_padrao
     paths = Paths(root=tmp_path)
     store = SettingsStore(paths)
     store.update(dict(config.DEFAULT_PERMISSIONS, pet=pet))

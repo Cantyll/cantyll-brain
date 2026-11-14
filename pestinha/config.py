@@ -5,21 +5,23 @@ Tudo o que o usuário escolhe na tela inicial mora em memory/permissions.json (v
 e é gravado a CADA mudança (se o programa cair, a escolha não se perde).
 """
 
+import os
 import random
 
 from . import ajustes
 from .paths import pet_id_valido
 from .store import read_json, read_lines, write_json
 
-# Núcleo neural (docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md, seção 11). "lif" é o padrão; "bio" (core/bio/) está
-# pronto desde o T2 e passa pela mesma suíte. Trocar o padrão é PR à parte, decidido pelo Cantyll (V7).
-# Um nome que não está pronto volta para "lif", sem trocar a rede em silêncio.
-CEREBRO = "lif"
+# Núcleo neural (docs/ESPECIFICACAO_NUCLEO_BIOLOGICO.md, seção 11). "bio" (core/bio/, com os neurônios da frente NE)
+# é o padrão desde a NE-5 (decisão do Cantyll, 2026-11-13, opção B). Volta para o LIF sem mexer no código:
+# PESTINHA_CEREBRO=lif no ambiente. Cada cérebro grava o próprio arquivo (core/bio/rede.py, arquivo_do_bio), então a
+# troca não apaga o estado do outro. Um nome que não está pronto volta para "lif", sem trocar a rede em silêncio.
+CEREBRO = os.environ.get("PESTINHA_CEREBRO", "").strip() or "bio"
 CEREBROS_PRONTOS = ("lif", "bio")
 
 
 def cerebro_escolhido(nome=None):
-    """Nome do cérebro a usar: o pedido, se estiver pronto; senão, o padrão 'lif'."""
+    """Nome do cérebro a usar: o pedido, se estiver pronto; senão, 'lif' (o congelado, que não muda)."""
     nome = CEREBRO if nome is None else nome
     return nome if nome in CEREBROS_PRONTOS else "lif"
 
